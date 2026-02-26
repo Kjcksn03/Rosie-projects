@@ -1,7 +1,8 @@
 services:
   - type: web
-    name: clinic-launch-tracker
+    name: New Clinic Launch Tracker
     env: python
+    rootDir: clinic-tracker
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
