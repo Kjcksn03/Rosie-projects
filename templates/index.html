@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – VIP Clinic Launch Tracker{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <div>
+      <div class="page-title">📍 Clinic Projects</div>
+      <div class="page-subtitle">All active clinic launches</div>
+    </div>
+    {% if session.role == 'admin' %}
+    <a href="{{ url_for('new_clinic') }}" class="btn btn-gold">➕ New Clinic</a>
+    {% endif %}
+  </div>
+
+  {% if clinic_stats %}
+  <div class="clinics-grid">
+    {% for cs in clinic_stats %}
+    <a href="{{ url_for('clinic_dashboard', clinic_id=cs.clinic.id) }}" class="clinic-card">
+      <div class="clinic-card-name">{{ cs.clinic.name }}</div>
+      <div class="clinic-card-meta">
+        {% if cs.clinic.opening_date %}
+        <span>🗓️ Opens {{ cs.clinic.opening_date }}</span>
+        {% endif %}
+        <span>{{ cs.total }} tasks</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" style="width:{{ cs.pct }}%"></div>
+      </div>
+      <div class="progress-label">{{ cs.pct }}% complete ({{ cs.done }}/{{ cs.total }})</div>
+      <div class="clinic-card-badges">
+        {% if cs.blocked > 0 %}
+        <span class="badge badge-blocked">🚫 {{ cs.blocked }} Blocked</span>
+        {% endif %}
+        {% if cs.overdue > 0 %}
+        <span class="badge badge-overdue">⚠️ {{ cs.overdue }} Overdue</span>
+        {% endif %}
+        {% if cs.blocked == 0 and cs.overdue == 0 %}
+        <span class="badge badge-complete">✅ On Track</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🏥</div>
+    <div style="font-size:17px;font-weight:600;color:var(--navy);margin-bottom:8px">No Clinics Yet</div>
+    <div style="margin-bottom:20px">Create your first clinic launch project to get started.</div>
+    {% if session.role == 'admin' %}
+    <a href="{{ url_for('new_clinic') }}" class="btn btn-gold">➕ Create First Clinic</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

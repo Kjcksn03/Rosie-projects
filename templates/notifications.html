@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Notifications – VIP Clinic Launch Tracker{% endblock %}
+{% block content %}
+<div class="container" style="max-width:700px">
+  <div class="page-header">
+    <div class="page-title">🔔 Notifications</div>
+  </div>
+  <div class="card">
+    <div class="notif-list">
+      {% if notifications %}
+        {% for n in notifications %}
+        <div class="notif-item {% if not n.is_read %}unread{% endif %}">
+          <div class="notif-dot {% if n.is_read %}read{% endif %}"></div>
+          <div style="flex:1">
+            {% if n.link %}
+            <a href="{{ n.link }}" style="color:var(--navy);text-decoration:none;font-weight:500">{{ n.message }}</a>
+            {% else %}
+            <span>{{ n.message }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:11px;color:var(--gray-400);white-space:nowrap">{{ n.created_at[:16] }}</div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty-state" style="padding:40px">
+        <div class="empty-state-icon">🔕</div>
+        <div>No notifications yet.</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
