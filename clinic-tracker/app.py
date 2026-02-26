@@ -608,7 +608,7 @@ def clinic_dashboard(clinic_id):
     if not clinic:
         flash('Clinic not found.', 'error')
         return redirect(url_for('index'))
-    tasks = query_db("SELECT * FROM tasks WHERE clinic_id=? ORDER BY department, order_index", [clinic_id])
+    tasks = query_db("SELECT * FROM tasks WHERE clinic_id=? ORDER BY department, days_before_opening, order_index", [clinic_id])
     # Build department stats
     dept_stats = {}
     for dept in DEPARTMENTS:
@@ -655,7 +655,7 @@ def clinic_tasks(clinic_id):
         q += " AND time_phase=?"; args.append(phase_filter)
     if status_filter:
         q += " AND status=?"; args.append(status_filter)
-    q += " ORDER BY department, order_index"
+    q += " ORDER BY department, days_before_opening, order_index"
     tasks = query_db(q, args)
     users = query_db("SELECT id, full_name, department FROM users ORDER BY full_name")
     today_str = str(datetime.now().date())
@@ -873,7 +873,7 @@ def template_tasks():
     if not tmpl:
         flash('Template not found.', 'error')
         return redirect(url_for('index'))
-    tasks = query_db("SELECT * FROM tasks WHERE clinic_id=? ORDER BY department, order_index", [tmpl['id']])
+    tasks = query_db("SELECT * FROM tasks WHERE clinic_id=? ORDER BY department, days_before_opening, order_index", [tmpl['id']])
     users_list = query_db("SELECT id, full_name FROM users ORDER BY full_name")
     return render_template('template.html', clinic=tmpl, tasks=tasks, users=users_list,
                            departments=DEPARTMENTS, time_phases=TIME_PHASES, statuses=STATUSES)
