@@ -162,11 +162,11 @@ def seed_template_tasks(db, clinic_id):
     # Strategic Growth
     tasks += [
         # Scouting
-        ('General demographic research on possible locations', 'Strategic Growth', 'Scouting', -180, 0),
-        ('Start scouting - rank and prioritize locations from demographic research', 'Strategic Growth', 'Scouting', -180, 1),
-        ('Visit locations of interest', 'Strategic Growth', 'Scouting', -180, 2),
-        ('Pull demographics specific to each location (during scouting)', 'Strategic Growth', 'Scouting', -180, 3),
-        ('Get scaled floor plan from landlords (3rd scouting)', 'Strategic Growth', 'Scouting', -180, 4),
+        ('General demographic research on possible locations', 'Strategic Growth', 'Scouting', -150, 0),
+        ('Start scouting - rank and prioritize locations from demographic research', 'Strategic Growth', 'Scouting', -150, 1),
+        ('Visit locations of interest', 'Strategic Growth', 'Scouting', -150, 2),
+        ('Pull demographics specific to each location (during scouting)', 'Strategic Growth', 'Scouting', -150, 3),
+        ('Get scaled floor plan from landlords (3rd scouting)', 'Strategic Growth', 'Scouting', -150, 4),
         # After Lease Signed
         ('Create marked up floor plan and work letter for landlords/contractors', 'Strategic Growth', 'After Lease Signed', -120, 5),
         ('Determine locations to send RFP (marked up floor plans)', 'Strategic Growth', 'After Lease Signed', -120, 6),
@@ -438,7 +438,7 @@ def seed_template_tasks(db, clinic_id):
     # Referrals Outreach
     tasks += [
         # Scouting
-        ('Begin referral outreach in areas being considered for new location', 'Referrals Outreach', 'Scouting', -180, 0),
+        ('Begin referral outreach in areas being considered for new location', 'Referrals Outreach', 'Scouting', -150, 0),
         # 2 Months Before Opening
         ('Build lead sourcing plan', 'Referrals Outreach', '2 Months Before Opening', -60, 0),
         ('Finalize top lead short list', 'Referrals Outreach', '2 Months Before Opening', -60, 1),
