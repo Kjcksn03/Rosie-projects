@@ -348,7 +348,7 @@ def seed_template_tasks(db, clinic_id):
         ('Confirm rent payment is set up', 'Accounting / Accounts Payable', 'After Lease Signed', -120, 0),
         ('Confirm security deposit is sent out', 'Accounting / Accounts Payable', 'After Lease Signed', -120, 1),
         # 1 Month Before Opening
-        ('Add clinic to check management protocol ClickUp space', 'Accounting / Accounts Payable', '1 Month Before Opening', -30, 0),
+        ('Add clinic to check management protocol ClickUp space (https://app.clickup.com/t/86dzk45rq)', 'Accounting / Accounts Payable', '1 Month Before Opening', -30, 0),
     ]
     # Credentialing
     tasks += [
