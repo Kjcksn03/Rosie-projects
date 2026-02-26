@@ -20,10 +20,15 @@ ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 
 DEPARTMENTS = [
     'Strategic Growth', 'Marketing', 'IT', 'Inventory', 'Operations',
     'Accounting / Accounts Payable', 'Credentialing', 'RODs & Clinic Leads',
-    'Malpractice (Unit)', 'Special Operations', 'Referrals', 'HR'
+    'Malpractice', 'Special Operations', 'Referrals Outreach', 'HR'
 ]
 
-TIME_PHASES = ['Pre-Lease', 'Post-Lease', '90 Days Out', '60 Days Out', '30 Days Out', 'Opening Week', 'Post-Opening']
+TIME_PHASES = [
+    'Scouting', 'After Lease Signed', '2 Months Before Opening', '1 Month Before Opening',
+    '2 Weeks Before Opening', '1 Week Before Opening', 'Week Before Opening', 'Opening Day',
+    '1 Week After Opening', '1 Month After Opening', '2 Months After Opening',
+    '3 Months After Opening', 'When New Provider Hired'
+]
 STATUSES = ['Not Started', 'In Progress', 'Complete', 'Blocked']
 
 # ─── Database ───────────────────────────────────────────────────────────────
@@ -156,7 +161,94 @@ def seed_template_tasks(db, clinic_id):
     tasks = []
     # Strategic Growth
     tasks += [
-        ('Identify target market and location demographics', 'Strategic Growth', 'Pre-Lease', -120, 0),
+        # Scouting
+        ('General demographic research on possible locations', 'Strategic Growth', 'Scouting', -180, 0),
+        ('Start scouting - rank and prioritize locations from demographic research', 'Strategic Growth', 'Scouting', -180, 1),
+        ('Visit locations of interest', 'Strategic Growth', 'Scouting', -180, 2),
+        ('Pull demographics specific to each location (during scouting)', 'Strategic Growth', 'Scouting', -180, 3),
+        ('Get scaled floor plan from landlords (3rd scouting)', 'Strategic Growth', 'Scouting', -180, 4),
+        # After Lease Signed
+        ('Create marked up floor plan and work letter for landlords/contractors', 'Strategic Growth', 'After Lease Signed', -120, 5),
+        ('Determine locations to send RFP (marked up floor plans)', 'Strategic Growth', 'After Lease Signed', -120, 6),
+        ('Review proposals received back', 'Strategic Growth', 'After Lease Signed', -120, 7),
+        ('Send counter proposals', 'Strategic Growth', 'After Lease Signed', -120, 8),
+        ('Get estimate from contractors on build out cost / discuss TI allowance', 'Strategic Growth', 'After Lease Signed', -120, 9),
+        ('Receive and review lease draft', 'Strategic Growth', 'After Lease Signed', -120, 10),
+        ('Red line the lease draft', 'Strategic Growth', 'After Lease Signed', -120, 11),
+        ('Send red lined lease to attorney for review', 'Strategic Growth', 'After Lease Signed', -120, 12),
+        ('Submit red lined lease to landlord/broker for final lease production', 'Strategic Growth', 'After Lease Signed', -120, 13),
+        ('Send email to Matt Stearns (CFO) with DocuSign timing, sender info, and key lease terms', 'Strategic Growth', 'After Lease Signed', -120, 14),
+        ('File fully executed lease copy in lease folder', 'Strategic Growth', 'After Lease Signed', -120, 15),
+        ('Send introductory questions to landlord/building manager after lease signed', 'Strategic Growth', 'After Lease Signed', -120, 16),
+        ('Inform RCM about new location in credentialing meeting (after lease signed)', 'Strategic Growth', 'After Lease Signed', -120, 17),
+        ('Send IT: floor plan, door lock mechanism pictures, site address, contact info', 'Strategic Growth', 'After Lease Signed', -120, 18),
+        ('Send new location address to HR', 'Strategic Growth', 'After Lease Signed', -120, 19),
+        ('Send marketing: signage info, measurements, pictures, recommended sign companies', 'Strategic Growth', 'After Lease Signed', -120, 20),
+        ('Send new clinic email to Accounts Payable with lease attached (rent and security deposit amounts)', 'Strategic Growth', 'After Lease Signed', -120, 21),
+        ('Confirm build out cost', 'Strategic Growth', 'After Lease Signed', -120, 22),
+        ('Confirm floor plan is correct', 'Strategic Growth', 'After Lease Signed', -120, 23),
+        ('Select finishes', 'Strategic Growth', 'After Lease Signed', -120, 24),
+        ('Review anticipated timeline', 'Strategic Growth', 'After Lease Signed', -120, 25),
+        ('Confirm correct contact info for build out', 'Strategic Growth', 'After Lease Signed', -120, 26),
+        ('Send email confirming entire build out discussion', 'Strategic Growth', 'After Lease Signed', -120, 27),
+        ('Send accounting final build out amounts', 'Strategic Growth', 'After Lease Signed', -120, 28),
+        ('Notify AP to set up new Divvy card for purchases', 'Strategic Growth', 'After Lease Signed', -120, 29),
+        ('Create liability insurance through LC', 'Strategic Growth', 'After Lease Signed', -120, 30),
+        ('Determine PO box for checks', 'Strategic Growth', 'After Lease Signed', -120, 31),
+        ('Confirm exam chair orders with Hill Beds', 'Strategic Growth', 'After Lease Signed', -120, 32),
+        ('Send diplomas and medical licenses of doctors to marketing (request digital signature if new doctor)', 'Strategic Growth', 'After Lease Signed', -120, 33),
+        # 2 Months Before Opening
+        ('Order ultrasound machines', 'Strategic Growth', '2 Months Before Opening', -60, 0),
+        ('Send liability to general liability insurance (Tiffany G, Kelly Jackson)', 'Strategic Growth', '2 Months Before Opening', -60, 1),
+        ('Review lease to understand all terms and services needed (cleaning, electricity, etc.)', 'Strategic Growth', '2 Months Before Opening', -60, 2),
+        ('Confirm setup and first day plan (who sets up, who is there opening day)', 'Strategic Growth', '2 Months Before Opening', -60, 3),
+        ('Send new clinic introduction and updates email', 'Strategic Growth', '2 Months Before Opening', -60, 4),
+        ('Audit websites (coming soon page up, GMB created)', 'Strategic Growth', '2 Months Before Opening', -60, 5),
+        # 1 Month Before Opening
+        ('Schedule fill tech for ultrasound setup', 'Strategic Growth', '1 Month Before Opening', -30, 0),
+        ('Lease review (confirm everything clear)', 'Strategic Growth', '1 Month Before Opening', -30, 1),
+        ('Confirm signage gets installed before first day', 'Strategic Growth', '1 Month Before Opening', -30, 2),
+        ('Add clinic photo and opening date to new clinic opening email task', 'Strategic Growth', '1 Month Before Opening', -30, 3),
+        ('Send opening email to staff at this clinic (photo + opening date)', 'Strategic Growth', '1 Month Before Opening', -30, 4),
+        ('Add opening date to VIP calendar', 'Strategic Growth', '1 Month Before Opening', -30, 5),
+        ('Create supply check-in sheet', 'Strategic Growth', '1 Month Before Opening', -30, 6),
+        ('Confirm chair delivery time', 'Strategic Growth', '1 Month Before Opening', -30, 7),
+        ('Audit websites and GMB for contact info', 'Strategic Growth', '1 Month Before Opening', -30, 8),
+        ('Send construction updates email to staff', 'Strategic Growth', '1 Month Before Opening', -30, 9),
+        # 2 Weeks Before Opening
+        ('Ask if any staff available to receive deliveries', 'Strategic Growth', '2 Weeks Before Opening', -14, 0),
+        ('Make sure new door lock system is set up', 'Strategic Growth', '2 Weeks Before Opening', -14, 1),
+        ('Send final construction updates', 'Strategic Growth', '2 Weeks Before Opening', -14, 2),
+        ('Order credit card machine', 'Strategic Growth', '2 Weeks Before Opening', -14, 3),
+        ('Schedule cleaners', 'Strategic Growth', '2 Weeks Before Opening', -14, 4),
+        ('Hire handyman for furniture assembly/mounting', 'Strategic Growth', '2 Weeks Before Opening', -14, 5),
+        ('Order furniture', 'Strategic Growth', '2 Weeks Before Opening', -14, 6),
+        # 1 Week Before Opening
+        ('Make sure IT has door locks set up', 'Strategic Growth', '1 Week Before Opening', -7, 0),
+        ('Make sure internet is set up', 'Strategic Growth', '1 Week Before Opening', -7, 1),
+        ('Set up computers, iPads, ultrasounds', 'Strategic Growth', '1 Week Before Opening', -7, 2),
+        # Week Before Opening
+        ('Update location lease summary', 'Strategic Growth', 'Week Before Opening', -5, 0),
+        ('Take clinic videos and written directions (for call center and Hub)', 'Strategic Growth', 'Week Before Opening', -5, 1),
+        ('Verify scanners, printers, and label printer functioning', 'Strategic Growth', 'Week Before Opening', -5, 2),
+        ('Test payment terminal', 'Strategic Growth', 'Week Before Opening', -5, 3),
+        ('Confirm cleaning crew performance', 'Strategic Growth', 'Week Before Opening', -5, 4),
+        ('Ensure emergency kit is set up', 'Strategic Growth', 'Week Before Opening', -5, 5),
+        ('Confirm trash pickup schedule', 'Strategic Growth', 'Week Before Opening', -5, 6),
+        ('Check in on deliveries', 'Strategic Growth', 'Week Before Opening', -5, 7),
+        ('Verify exam rooms are stocked', 'Strategic Growth', 'Week Before Opening', -5, 8),
+        ('Sunday check: sign on door, on directory, delivery sign up, monument sign up', 'Strategic Growth', 'Week Before Opening', -5, 9),
+        ('Stock pantries/break room', 'Strategic Growth', 'Week Before Opening', -5, 10),
+        ('Send "Actions Needed" email to ROD (day before opening)', 'Strategic Growth', 'Week Before Opening', -5, 11),
+        ('Send "Important Information for Your First Day" email to all staff at new clinic (day before opening)', 'Strategic Growth', 'Week Before Opening', -5, 12),
+        ('Final lease review - make sure everything in lease summary and staff informed', 'Strategic Growth', 'Week Before Opening', -5, 13),
+        # Opening Day
+        ('Send email to accounting with asset list (exam chairs, ultrasound, major assets now in use)', 'Strategic Growth', 'Opening Day', 0, 0),
+        # 1 Week After Opening
+        ('Send first week check-in email to ROD', 'Strategic Growth', '1 Week After Opening', 7, 0),
+        # 1 Month After Opening
+        ('Send first month check-in email to ROD', 'Strategic Growth', '1 Month After Opening', 30, 0),
+    ]
         ('Conduct feasibility study and ROI analysis', 'Strategic Growth', 'Pre-Lease', -110, 1),
         ('Secure lease agreement and negotiate terms', 'Strategic Growth', 'Pre-Lease', -90, 2),
         ('Define clinic service offerings and capacity plan', 'Strategic Growth', 'Post-Lease', -75, 3),
@@ -166,112 +258,213 @@ def seed_template_tasks(db, clinic_id):
     ]
     # Marketing
     tasks += [
-        ('Develop clinic brand identity and local marketing plan', 'Marketing', 'Post-Lease', -80, 0),
-        ('Design clinic signage, banners, and printed materials', 'Marketing', '60 Days Out', -60, 1),
-        ('Build clinic-specific landing page / microsite', 'Marketing', '60 Days Out', -55, 2),
-        ('Set up Google Business Profile and online listings', 'Marketing', '60 Days Out', -50, 3),
-        ('Launch social media accounts for clinic', 'Marketing', '30 Days Out', -35, 4),
-        ('Run pre-launch ads and promotions', 'Marketing', '30 Days Out', -28, 5),
-        ('Coordinate grand opening PR and media outreach', 'Marketing', 'Opening Week', -7, 6),
-        ('Post-opening patient review campaign', 'Marketing', 'Post-Opening', 14, 7),
+        # After Lease Signed
+        ('Prepare building signage', 'Marketing', 'After Lease Signed', -120, 0),
+        ('Create print materials', 'Marketing', 'After Lease Signed', -120, 1),
+        ('Coordinate photo shoot of new doctor with Carly', 'Marketing', 'After Lease Signed', -120, 2),
+        ('Set up GMB, Yelp, Apple Maps, Bing pages', 'Marketing', 'After Lease Signed', -120, 3),
+        ('Set up all websites and microsites', 'Marketing', 'After Lease Signed', -120, 4),
+        # 2 Months Before Opening
+        ('Verify GMB page is set up correctly and working', 'Marketing', '2 Months Before Opening', -60, 0),
+        ('Update marketing tab on supply check-in sheet (confirm quantities and supplies correct for this clinic)', 'Marketing', '2 Months Before Opening', -60, 1),
+        # 1 Month Before Opening
+        ('Create ads (don\'t start them yet)', 'Marketing', '1 Month Before Opening', -30, 0),
+        ('Add clinic information to website, microsites, and GMB', 'Marketing', '1 Month Before Opening', -30, 1),
+        ('Order marketing supplies from Ops based on supply check-in sheet', 'Marketing', '1 Month Before Opening', -30, 2),
+        # 2 Weeks Before Opening
+        ('Turn on ads', 'Marketing', '2 Weeks Before Opening', -14, 0),
+        ('Make sure signs are installed', 'Marketing', '2 Weeks Before Opening', -14, 1),
+        # 1 Month After Opening
+        ('Send marketing materials feedback form', 'Marketing', '1 Month After Opening', 30, 0),
     ]
     # IT
     tasks += [
-        ('Assess IT infrastructure needs for new clinic', 'IT', 'Post-Lease', -80, 0),
-        ('Order and configure workstations, tablets, printers', 'IT', '60 Days Out', -60, 1),
-        ('Set up clinic network (internet, VoIP, Wi-Fi)', 'IT', '60 Days Out', -55, 2),
-        ('Install and configure EHR / practice management software', 'IT', '30 Days Out', -35, 3),
-        ('Configure scheduling system and patient portal', 'IT', '30 Days Out', -30, 4),
-        ('Set up security cameras and access control', 'IT', '30 Days Out', -25, 5),
-        ('Conduct full IT systems test and staff walkthrough', 'IT', 'Opening Week', -5, 6),
-        ('Go-live support on opening day', 'IT', 'Opening Week', 0, 7),
+        # After Lease Signed
+        ('Determine IT setup plan and communicate to Strategic Growth', 'IT', 'After Lease Signed', -120, 0),
+        # 2 Months Before Opening
+        ('Schedule internet setup', 'IT', '2 Months Before Opening', -60, 0),
+        ('Order tech items and arrange delivery', 'IT', '2 Months Before Opening', -60, 1),
+        ('Confirm internet setup dates with Strategic Growth team', 'IT', '2 Months Before Opening', -60, 2),
+        # 1 Month Before Opening
+        ('Create NextTech elements and clinic ops check', 'IT', '1 Month Before Opening', -30, 0),
+        ('Link digital signature to NextTech', 'IT', '1 Month Before Opening', -30, 1),
+        ('Generate provider profile in NextTech', 'IT', '1 Month Before Opening', -30, 2),
+        ('Access provider\'s account and add signature as default signature (with date)', 'IT', '1 Month Before Opening', -30, 3),
+        ('Change preferences to automatically change status of eMins signed to "Sign by Provider"', 'IT', '1 Month Before Opening', -30, 4),
+        ('Add new location to NextTech (ASC or regular location)', 'IT', '1 Month Before Opening', -30, 5),
+        ('EMR setup: add provider info to ultrasound note', 'IT', '1 Month Before Opening', -30, 6),
+        # 1 Week Before Opening
+        ('Set up ultrasounds, TVs, iPads, Sonos, security cameras, and computers', 'IT', '1 Week Before Opening', -7, 0),
+        ('Designate person to be on call for first day', 'IT', '1 Week Before Opening', -7, 1),
+        ('Add location to facility/badge access system', 'IT', '1 Week Before Opening', -7, 2),
     ]
     # Inventory
     tasks += [
-        ('Create master inventory list for clinic type', 'Inventory', 'Post-Lease', -75, 0),
-        ('Source and negotiate with medical supply vendors', 'Inventory', '60 Days Out', -60, 1),
-        ('Order medical equipment (exam tables, diagnostic tools)', 'Inventory', '60 Days Out', -55, 2),
-        ('Order office and administrative supplies', 'Inventory', '30 Days Out', -35, 3),
-        ('Receive and inspect all equipment deliveries', 'Inventory', '30 Days Out', -20, 4),
-        ('Set up supply room and inventory tracking system', 'Inventory', 'Opening Week', -7, 5),
-        ('Verify controlled substance storage compliance', 'Inventory', 'Opening Week', -5, 6),
+        # 1 Month Before Opening
+        ('Set up Medtronic account', 'Inventory', '1 Month Before Opening', -30, 0),
+        ('Set up Besse account', 'Inventory', '1 Month Before Opening', -30, 1),
+        ('Set up McKesson account', 'Inventory', '1 Month Before Opening', -30, 2),
+        ('Set up Total Vein account', 'Inventory', '1 Month Before Opening', -30, 3),
+        ('Set up Carolon Compression Stockings account', 'Inventory', '1 Month Before Opening', -30, 4),
+        ('Set up Asclera Pine Pharmacy / Methapharm account', 'Inventory', '1 Month Before Opening', -30, 5),
+        ('Set up Boston Scientific / BTG account', 'Inventory', '1 Month Before Opening', -30, 6),
+        ('Set up Airgas account', 'Inventory', '1 Month Before Opening', -30, 7),
+        ('Set up Stericycle account', 'Inventory', '1 Month Before Opening', -30, 8),
+        ('Set up Water Cooler Company account', 'Inventory', '1 Month Before Opening', -30, 9),
+        ('Order supplies from supply check-in sheet', 'Inventory', '1 Month Before Opening', -30, 10),
+        # 1 Week Before Opening
+        ('Add expiration dates for emergency meds to system', 'Inventory', '1 Week Before Opening', -7, 0),
+        ('Determine who will be doing inventory for this location', 'Inventory', '1 Week Before Opening', -7, 1),
+        # Week Before Opening
+        ('Finalize with Strategic Growth that all initial supplies were received and transitioning to formal inventory orders', 'Inventory', 'Week Before Opening', -5, 0),
+        # 1 Month After Opening
+        ('Order any additional items requested during opening week (items added to supply check-in sheet during opening)', 'Inventory', '1 Month After Opening', 30, 0),
     ]
     # Operations
     tasks += [
-        ('Draft clinic standard operating procedures (SOPs)', 'Operations', 'Post-Lease', -70, 0),
-        ('Hire clinical and administrative staff', 'Operations', '60 Days Out', -60, 1),
-        ('Schedule staff onboarding and orientation', 'Operations', '30 Days Out', -30, 2),
-        ('Conduct mock patient flow walkthrough', 'Operations', '30 Days Out', -21, 3),
-        ('Set up patient scheduling templates', 'Operations', '30 Days Out', -20, 4),
-        ('Complete OSHA and safety training for all staff', 'Operations', 'Opening Week', -7, 5),
-        ('Final operational readiness review', 'Operations', 'Opening Week', -2, 6),
+        # After Lease Signed
+        ('Create emergency number for the doctors', 'Operations', 'After Lease Signed', -120, 0),
+        ('Send New Location Alert to all teams (call center, scheduling, verifications, patient coordinators, RCM, etc.)', 'Operations', 'After Lease Signed', -120, 1),
+        ('Update the Hub - doctor info up to date and clinic linked to doctor\'s site', 'Operations', 'After Lease Signed', -120, 2),
+        ('Create site for new clinic on the Hub', 'Operations', 'After Lease Signed', -120, 3),
+        ('Update schedules on Hub', 'Operations', 'After Lease Signed', -120, 4),
+        ('Create Medwork location - NextTech mapping', 'Operations', 'After Lease Signed', -120, 5),
+        ('Create Medwork location - Medwork 1.0 and 2.0', 'Operations', 'After Lease Signed', -120, 6),
+        ('Create front desk email', 'Operations', 'After Lease Signed', -120, 7),
+        # 1 Month Before Opening
+        ('Add location to ClearWave', 'Operations', '1 Month Before Opening', -30, 0),
+        ('Add schedule to Hub', 'Operations', '1 Month Before Opening', -30, 1),
+        ('Confirm schedule is open', 'Operations', '1 Month Before Opening', -30, 2),
+        ('Add location and doctor to Luma', 'Operations', '1 Month Before Opening', -30, 3),
+        # 1 Week Before Opening
+        ('Test check-in workflows with mock patient', 'Operations', '1 Week Before Opening', -7, 0),
+        ('Determine key needs and make appropriate copies', 'Operations', '1 Week Before Opening', -7, 1),
+        # 1 Week After Opening
+        ('Determine opening and closing protocols', 'Operations', '1 Week After Opening', 7, 0),
+        # 1 Month After Opening
+        ('Run new clinic audit', 'Operations', '1 Month After Opening', 30, 0),
+        ('One month check', 'Operations', '1 Month After Opening', 30, 1),
+        # 2 Months After Opening
+        ('Two month check', 'Operations', '2 Months After Opening', 60, 0),
+        # 3 Months After Opening
+        ('Three month check', 'Operations', '3 Months After Opening', 90, 0),
     ]
     # Accounting / Accounts Payable
     tasks += [
-        ('Set up clinic cost center / chart of accounts', 'Accounting / Accounts Payable', 'Post-Lease', -70, 0),
-        ('Establish vendor payment accounts and billing setup', 'Accounting / Accounts Payable', '60 Days Out', -55, 1),
-        ('Set up payroll for new clinic staff', 'Accounting / Accounts Payable', '30 Days Out', -30, 2),
-        ('Configure insurance billing and payer contracts', 'Accounting / Accounts Payable', '30 Days Out', -28, 3),
-        ('Establish petty cash and clinic operating funds', 'Accounting / Accounts Payable', 'Opening Week', -7, 4),
-        ('First payroll cycle confirmation', 'Accounting / Accounts Payable', 'Post-Opening', 14, 5),
+        # After Lease Signed
+        ('Confirm rent payment is set up', 'Accounting / Accounts Payable', 'After Lease Signed', -120, 0),
+        ('Confirm security deposit is sent out', 'Accounting / Accounts Payable', 'After Lease Signed', -120, 1),
+        # 1 Month Before Opening
+        ('Add clinic to check management protocol ClickUp space', 'Accounting / Accounts Payable', '1 Month Before Opening', -30, 0),
     ]
     # Credentialing
     tasks += [
-        ('Identify all providers requiring credentialing', 'Credentialing', 'Post-Lease', -80, 0),
-        ('Submit provider credentialing applications to payers', 'Credentialing', '90 Days Out', -90, 1),
-        ('Obtain clinic NPI (Type 2)', 'Credentialing', '90 Days Out', -85, 2),
-        ('Register clinic with state medical board', 'Credentialing', '60 Days Out', -60, 3),
-        ('Follow up on pending credentialing applications', 'Credentialing', '30 Days Out', -30, 4),
-        ('Confirm all providers credentialed before opening', 'Credentialing', 'Opening Week', -7, 5),
-        ('File any post-opening credentialing updates', 'Credentialing', 'Post-Opening', 30, 6),
+        # When New Provider Hired
+        ('Send welcome email to new provider and start collecting credentialing documents', 'Credentialing', 'When New Provider Hired', 0, 0),
+        # After Lease Signed
+        ('Initiate out-of-network linking to PPO plans', 'Credentialing', 'After Lease Signed', -120, 0),
+        ('Start credentialing enrollment for HMOs (if applicable, e.g. California)', 'Credentialing', 'After Lease Signed', -120, 1),
+        ('Start Medicare credentialing enrollment for the provider', 'Credentialing', 'After Lease Signed', -120, 2),
+        # 1 Week Before Opening
+        ('Confirm what plans the provider is fully linked with and participating in', 'Credentialing', '1 Week Before Opening', -7, 0),
+        ('Share confirmed plan participation with Operations and Strategic Growth', 'Credentialing', '1 Week Before Opening', -7, 1),
     ]
     # RODs & Clinic Leads
     tasks += [
-        ('Assign Regional Operations Director (ROD) to clinic', 'RODs & Clinic Leads', 'Post-Lease', -70, 0),
-        ('Hire and onboard Clinic Lead / Office Manager', 'RODs & Clinic Leads', '60 Days Out', -60, 1),
-        ('ROD conducts site visit and readiness assessment', 'RODs & Clinic Leads', '30 Days Out', -21, 2),
-        ('Clinic Lead completes leadership training', 'RODs & Clinic Leads', '30 Days Out', -20, 3),
-        ('Define escalation and communication protocols', 'RODs & Clinic Leads', '30 Days Out', -14, 4),
-        ('Pre-opening staff meeting led by Clinic Lead', 'RODs & Clinic Leads', 'Opening Week', -3, 5),
-        ('Week 1 daily check-in calls with ROD', 'RODs & Clinic Leads', 'Post-Opening', 1, 6),
+        # After Lease Signed
+        ('Determine if this will be a virtual front desk location; inform Strategic Growth', 'RODs & Clinic Leads', 'After Lease Signed', -120, 0),
+        ('Hire new staff and start new staff training (if not started beforehand)', 'RODs & Clinic Leads', 'After Lease Signed', -120, 1),
+        ('Verify that front desk, office staff, and MAs can be hired and trained in time; confirm with Strategic Growth that opening date is feasible', 'RODs & Clinic Leads', 'After Lease Signed', -120, 2),
+        # 1 Month Before Opening
+        ('Set up ultrasound training for staff', 'RODs & Clinic Leads', '1 Month Before Opening', -30, 0),
+        # Opening Day
+        ('Check out proper keys and key cards to each staff member; keep a list of who has what keys/key cards', 'RODs & Clinic Leads', 'Opening Day', 0, 0),
+        ('Do Unified door training (how to arm/disarm alarm, set door open for certain hours, re-lock, use Unified door system)', 'RODs & Clinic Leads', 'Opening Day', 0, 1),
+        ('Confirm iPads are logged into correct accounts and working', 'RODs & Clinic Leads', 'Opening Day', 0, 2),
+        ('Confirm ultrasound uploads are working and images uploading to correct location in NextTech', 'RODs & Clinic Leads', 'Opening Day', 0, 3),
+        ('Walk through waiting area — check cleanliness and seating before opening to patients', 'RODs & Clinic Leads', 'Opening Day', 0, 4),
+        ('Ensure downtime packets are printed and accessible (in case internet goes down)', 'RODs & Clinic Leads', 'Opening Day', 0, 5),
+        ('Observe patient check-in process and give feedback', 'RODs & Clinic Leads', 'Opening Day', 0, 6),
+        ('Shadow provider\'s first consult — observe and give feedback', 'RODs & Clinic Leads', 'Opening Day', 0, 7),
+        ('Confirm patient movement flow is smooth (waiting room → scan → provider → checkout)', 'RODs & Clinic Leads', 'Opening Day', 0, 8),
+        ('Identify any bottlenecks or delays and address them', 'RODs & Clinic Leads', 'Opening Day', 0, 9),
+        ('Provide breakfast for the team on the first day', 'RODs & Clinic Leads', 'Opening Day', 0, 10),
+        ('Hold team huddle at start of day (front desk, sonographers, provider)', 'RODs & Clinic Leads', 'Opening Day', 0, 11),
+        ('Review processes with front desk — ensure they can apply training and are ready', 'RODs & Clinic Leads', 'Opening Day', 0, 12),
+        ('Print out Mercy Manual and put in red binder', 'RODs & Clinic Leads', 'Opening Day', 0, 13),
+        ('Ensure everyone in clinic knows where Mercy Kit is located and what\'s in it', 'RODs & Clinic Leads', 'Opening Day', 0, 14),
+        ('Get safe set up and go over safe protocol', 'RODs & Clinic Leads', 'Opening Day', 0, 15),
+        # 1 Week After Opening
+        ('Finish receiving and checking in all deliveries on supply check-in sheet', 'RODs & Clinic Leads', '1 Week After Opening', 7, 0),
+        ('Identify any additional supplies needed that haven\'t been ordered; add to supply check-in sheet', 'RODs & Clinic Leads', '1 Week After Opening', 7, 1),
+        ('Verify daily ultrasound images are uploading consistently to PACS', 'RODs & Clinic Leads', '1 Week After Opening', 7, 2),
+        ('Audit image quality', 'RODs & Clinic Leads', '1 Week After Opening', 7, 3),
+        ('Confirm cleaning staff schedule and that clinic team knows when they come in', 'RODs & Clinic Leads', '1 Week After Opening', 7, 4),
+        ('Review supply inventory process, how to use inventory sheet, and how to reorder supplies with clinic team', 'RODs & Clinic Leads', '1 Week After Opening', 7, 5),
+        ('Confirm consents are being completed properly in NextTech', 'RODs & Clinic Leads', '1 Week After Opening', 7, 6),
+        ('Provide summary of first week observations to Strategic Growth (feedback on improvements)', 'RODs & Clinic Leads', '1 Week After Opening', 7, 7),
+        # 1 Month After Opening
+        ('Review patient feedback and wait times', 'RODs & Clinic Leads', '1 Month After Opening', 30, 0),
+        ('Confirm techs are using correct measurements and protocols', 'RODs & Clinic Leads', '1 Month After Opening', 30, 1),
+        ('Review abnormal studies with providers', 'RODs & Clinic Leads', '1 Month After Opening', 30, 2),
+        ('Identify top 5 operational gaps', 'RODs & Clinic Leads', '1 Month After Opening', 30, 3),
+        ('Review scheduling patterns (no-shows, bottlenecks)', 'RODs & Clinic Leads', '1 Month After Opening', 30, 4),
     ]
-    # Malpractice (Unit)
+    # Malpractice
     tasks += [
-        ('Identify malpractice insurance carrier and policy type', 'Malpractice (Unit)', 'Post-Lease', -80, 0),
-        ('Submit application for clinic malpractice coverage', 'Malpractice (Unit)', '90 Days Out', -85, 1),
-        ('Obtain certificates of insurance for all providers', 'Malpractice (Unit)', '60 Days Out', -55, 2),
-        ('Review policy exclusions and coverage limits', 'Malpractice (Unit)', '30 Days Out', -28, 3),
-        ('Confirm malpractice coverage active before opening', 'Malpractice (Unit)', 'Opening Week', -7, 4),
-        ('File any updated policy documentation post-opening', 'Malpractice (Unit)', 'Post-Opening', 30, 5),
+        # After Lease Signed
+        ('Create new malpractice insurance for the new provider with the correct new location (if new provider)', 'Malpractice', 'After Lease Signed', -120, 0),
+        ('Add the new location to the provider\'s COI - Certificate of Insurance (if existing provider)', 'Malpractice', 'After Lease Signed', -120, 1),
     ]
     # Special Operations
     tasks += [
-        ('Coordinate buildout / construction oversight', 'Special Operations', 'Post-Lease', -80, 0),
-        ('Obtain Certificate of Occupancy', 'Special Operations', '60 Days Out', -60, 1),
-        ('Schedule and pass health department inspection', 'Special Operations', '30 Days Out', -25, 2),
-        ('Coordinate DEA registration for clinic', 'Special Operations', '60 Days Out', -50, 3),
-        ('Ensure ADA compliance review completed', 'Special Operations', '30 Days Out', -30, 4),
-        ('Coordinate soft-open / friends & family testing day', 'Special Operations', 'Opening Week', -3, 5),
+        # After Lease Signed
+        ('Update ClickUp MR mapping', 'Special Operations', 'After Lease Signed', -120, 0),
+        ('Update ClickUp Insurance Billing mapping', 'Special Operations', 'After Lease Signed', -120, 1),
+        ('Update Saturation Report', 'Special Operations', 'After Lease Signed', -120, 2),
+        ('Update Master Insurance Location', 'Special Operations', 'After Lease Signed', -120, 3),
+        ('Update High Level Report', 'Special Operations', 'After Lease Signed', -120, 4),
+        ('Update Collections Report', 'Special Operations', 'After Lease Signed', -120, 5),
+        ('Update Bill Scrub Report', 'Special Operations', 'After Lease Signed', -120, 6),
+        ('Update Discrepancy Report', 'Special Operations', 'After Lease Signed', -120, 7),
+        ('Update Appointment Audit', 'Special Operations', 'After Lease Signed', -120, 8),
+        ('Update Conservative Report', 'Special Operations', 'After Lease Signed', -120, 9),
+        ('Update Reconciliation Report', 'Special Operations', 'After Lease Signed', -120, 10),
+        ('Update Productivity mapping', 'Special Operations', 'After Lease Signed', -120, 11),
+        # 1 Month Before Opening
+        ('Set up data reports', 'Special Operations', '1 Month Before Opening', -30, 0),
+        ('Ramp up update', 'Special Operations', '1 Month Before Opening', -30, 1),
+        ('Opening date setup', 'Special Operations', '1 Month Before Opening', -30, 2),
+        ('Marketing data set update', 'Special Operations', '1 Month Before Opening', -30, 3),
+        ('Amazon connection / Q configuration', 'Special Operations', '1 Month Before Opening', -30, 4),
+        ('Google My Business (GMB) update', 'Special Operations', '1 Month Before Opening', -30, 5),
+        ('ClickUp mapping', 'Special Operations', '1 Month Before Opening', -30, 6),
+        ('NextTech mapping', 'Special Operations', '1 Month Before Opening', -30, 7),
+        ('MPS update', 'Special Operations', '1 Month Before Opening', -30, 8),
     ]
-    # Referrals
+    # Referrals Outreach
     tasks += [
-        ('Map referral network in clinic\'s geographic area', 'Referrals', '60 Days Out', -60, 0),
-        ('Reach out to local PCPs and specialists for referral agreements', 'Referrals', '30 Days Out', -35, 1),
-        ('Develop referral packet / welcome kit for partners', 'Referrals', '30 Days Out', -28, 2),
-        ('Set up referral tracking in EHR', 'Referrals', '30 Days Out', -21, 3),
-        ('Host referral partner meet-and-greet at clinic', 'Referrals', 'Opening Week', -1, 4),
-        ('Review first-month referral volume report', 'Referrals', 'Post-Opening', 30, 5),
+        # Scouting
+        ('Begin referral outreach in areas being considered for new location', 'Referrals Outreach', 'Scouting', -180, 0),
+        # 2 Months Before Opening
+        ('Build lead sourcing plan', 'Referrals Outreach', '2 Months Before Opening', -60, 0),
+        ('Finalize top lead short list', 'Referrals Outreach', '2 Months Before Opening', -60, 1),
+        # 1 Month Before Opening
+        ('Launch outreach', 'Referrals Outreach', '1 Month Before Opening', -30, 0),
+        ('Activation check: establish partnerships + first referral watch + 45 days', 'Referrals Outreach', '1 Month Before Opening', -30, 1),
+        ('Share short list with Regional Operations Directors for site visit', 'Referrals Outreach', '1 Month Before Opening', -30, 2),
+        # 1 Week Before Opening
+        ('Send opening announcement touch to top targets (logged in HubSpot)', 'Referrals Outreach', '1 Week Before Opening', -7, 0),
+        ('Order opening day marketing materials for referrals', 'Referrals Outreach', '1 Week Before Opening', -7, 1),
     ]
     # HR
     tasks += [
-        ('Define staffing plan and job descriptions for clinic', 'HR', 'Post-Lease', -75, 0),
-        ('Post job listings and begin recruitment', 'HR', '60 Days Out', -65, 1),
-        ('Complete interviews and extend offers', 'HR', '60 Days Out', -50, 2),
-        ('Complete background checks and onboarding paperwork', 'HR', '30 Days Out', -35, 3),
-        ('Enroll new staff in benefits and payroll', 'HR', '30 Days Out', -28, 4),
-        ('Conduct HR orientation and policy review', 'HR', '30 Days Out', -21, 5),
-        ('Confirm all staff credentialed, licensed, and cleared', 'HR', 'Opening Week', -7, 6),
-        ('90-day new hire check-ins scheduled', 'HR', 'Post-Opening', 14, 7),
+        # After Lease Signed
+        ('Add new location to Rippling', 'HR', 'After Lease Signed', -120, 0),
+        # 1 Month Before Opening
+        ('Order HR compliance posters (to be delivered the week before opening)', 'HR', '1 Month Before Opening', -30, 0),
+        # When New Provider Hired
+        ('Add any new staff to this location in Rippling', 'HR', 'When New Provider Hired', 0, 0),
     ]
 
     for (name, dept, phase, offset, order) in tasks:
