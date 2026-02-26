@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Quick Check – {{ clinic.name }}{% endblock %}
+{% block content %}
+<div class="container" style="max-width:800px">
+  <div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Quick Check</span>
+  </div>
+
+  <div class="page-header">
+    <div class="page-title">🔍 Quick Check</div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="GET" class="qc-select-row">
+        <span style="font-size:15px;font-weight:600;color:var(--navy)">What has</span>
+        <select name="dept" class="form-control" style="width:auto;min-width:200px" onchange="this.form.submit()">
+          {% for d in departments %}
+          <option value="{{ d }}" {% if d == dept %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+        <span style="font-size:15px;font-weight:600;color:var(--navy)">done lately?</span>
+      </form>
+    </div>
+  </div>
+
+  {% if tasks %}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">{{ dept }} – Recent Activity</span>
+      <span class="badge badge-gold">{{ tasks|length }} tasks</span>
+    </div>
+    {% for t in tasks %}
+    <div style="padding:14px 20px;border-bottom:1px solid var(--gray-100)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <a href="{{ url_for('task_detail', task_id=t.id) }}" style="font-weight:600;color:var(--navy);text-decoration:none">{{ t.name }}</a>
+          <div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+            {% if t.status == 'Not Started' %}<span class="badge badge-not-started">{{ t.status }}</span>
+            {% elif t.status == 'In Progress' %}<span class="badge badge-in-progress">{{ t.status }}</span>
+            {% elif t.status == 'Complete' %}<span class="badge badge-complete">{{ t.status }}</span>
+            {% elif t.status == 'Blocked' %}<span class="badge badge-blocked">{{ t.status }}</span>
+            {% endif %}
+            {% if t.time_phase %}<span class="badge badge-not-started">{{ t.time_phase }}</span>{% endif %}
+            {% if t.due_date %}<span style="font-size:12px;color:var(--gray-400)">📅 {{ t.due_date }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% if t.last_note %}
+      <div class="note-item mt-2">
+        <div class="note-header">
+          <span class="note-author">{{ t.note_author }}</span>
+          <span>{{ t.note_time[:16] }}</span>
+        </div>
+        <div class="note-content">{{ t.last_note }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🔍</div>
+    <div>No recent activity for {{ dept }}.</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

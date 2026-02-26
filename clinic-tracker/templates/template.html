@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Master Template – VIP Clinic Launch Tracker{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="page-header">
+    <div>
+      <div class="page-title">📋 Master Template</div>
+      <div class="page-subtitle">All new clinics are created from this template</div>
+    </div>
+  </div>
+
+  <!-- Add task form -->
+  <div class="card mb-3">
+    <div class="card-header"><span class="card-title">➕ Add Template Task</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('template_new_task') }}">
+        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Task Name *</label>
+            <input type="text" name="name" class="form-control" required placeholder="Task description">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Department *</label>
+            <select name="department" class="form-control" required>
+              <option value="">Select…</option>
+              {% for d in departments %}
+              <option value="{{ d }}">{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time Phase</label>
+            <select name="time_phase" class="form-control">
+              <option value="">–</option>
+              {% for p in time_phases %}
+              <option value="{{ p }}">{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Days from Opening</label>
+            <input type="number" name="template_offset_days" class="form-control" value="-30" placeholder="-30">
+            <small class="text-muted">Negative = before opening</small>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-gold">Add Task</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Template tasks by dept -->
+  {% set ns = namespace(current_dept='') %}
+  {% for task in tasks %}
+    {% if task.department != ns.current_dept %}
+      {% if ns.current_dept != '' %}</tbody></table></div></div>{% endif %}
+      {% set ns.current_dept = task.department %}
+      <div class="dept-section">
+        <div class="dept-header">
+          <div class="dept-header-left">
+            <span class="collapse-icon">▼</span>
+            <span>{{ task.department }}</span>
+          </div>
+        </div>
+        <div class="dept-body">
+        <div style="overflow-x:auto">
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th>Task Name</th>
+              <th>Phase</th>
+              <th>Days from Opening</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+    {% endif %}
+    <tr>
+      <td>{{ task.name }}</td>
+      <td><span class="badge badge-not-started">{{ task.time_phase or '–' }}</span></td>
+      <td>{{ task.template_offset_days }}</td>
+      <td>
+        <form method="POST" action="{{ url_for('template_delete_task', task_id=task.id) }}" class="confirm-delete" style="display:inline">
+          <button class="btn btn-danger btn-xs">Delete</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  {% if tasks %}</tbody></table></div></div></div>{% endif %}
+</div>
+{% endblock %}

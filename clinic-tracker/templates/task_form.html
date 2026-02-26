@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}New Task – {{ clinic.name }}{% endblock %}
+{% block content %}
+<div class="container" style="max-width:680px">
+  <div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>New Task</span>
+  </div>
+  <div class="page-title mb-3">➕ New Task</div>
+  <div class="card">
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Task Name *</label>
+          <input type="text" name="name" class="form-control" required autofocus>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Department *</label>
+            <select name="department" class="form-control" required>
+              <option value="">Select…</option>
+              {% for d in departments %}
+              <option value="{{ d }}">{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time Phase</label>
+            <select name="time_phase" class="form-control">
+              <option value="">Select…</option>
+              {% for p in time_phases %}
+              <option value="{{ p }}">{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Due Date</label>
+            <input type="date" name="due_date" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select name="status" class="form-control">
+              {% for s in statuses %}
+              <option value="{{ s }}">{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Assignees</label>
+          <select name="assignees" class="form-control" multiple style="height:120px">
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.full_name }}</option>
+            {% endfor %}
+          </select>
+          <small class="text-muted">Hold Ctrl/Cmd to select multiple</small>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button type="submit" class="btn btn-gold">Create Task</button>
+          <a href="{{ url_for('clinic_tasks', clinic_id=clinic.id) }}" class="btn btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

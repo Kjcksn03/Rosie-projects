@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}VIP Medical Group | Clinic Launch Tracker{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% if session.user_id %}
+  <nav class="navbar">
+    <a class="navbar-brand" href="{{ url_for('index') }}">
+      <span class="logo-vip">VIP</span>
+      <span class="logo-sep">|</span>
+      <span>Clinic Launch Tracker</span>
+    </a>
+    <div class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="navbar-links" id="navbar-links">
+      <a href="{{ url_for('index') }}">🏠 Clinics</a>
+      {% if session.role == 'admin' %}
+      <a href="{{ url_for('new_clinic') }}">➕ New Clinic</a>
+      <a href="{{ url_for('template_tasks') }}">📋 Template</a>
+      <a href="{{ url_for('admin_users') }}">👥 Users</a>
+      {% endif %}
+      <a href="{{ url_for('notifications') }}">
+        🔔 Alerts
+        <span class="notif-badge" {% if unread_count() == 0 %}style="display:none"{% endif %}>{{ unread_count() }}</span>
+      </a>
+      <a href="{{ url_for('logout') }}">🚪 {{ session.full_name }}</a>
+    </div>
+  </nav>
+  {% endif %}
+
+  <div class="flash-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ 'success' if cat == 'success' else 'error' if cat == 'error' else 'info' }}">
+          {% if cat == 'success' %}✅{% elif cat == 'error' %}⚠️{% else %}ℹ️{% endif %}
+          {{ msg }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  {% block content %}{% endblock %}
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
