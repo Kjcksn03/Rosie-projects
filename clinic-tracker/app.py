@@ -249,13 +249,6 @@ def seed_template_tasks(db, clinic_id):
         # 1 Month After Opening
         ('Send first month check-in email to ROD', 'Strategic Growth', '1 Month After Opening', 30, 0),
     ]
-        ('Conduct feasibility study and ROI analysis', 'Strategic Growth', 'Pre-Lease', -110, 1),
-        ('Secure lease agreement and negotiate terms', 'Strategic Growth', 'Pre-Lease', -90, 2),
-        ('Define clinic service offerings and capacity plan', 'Strategic Growth', 'Post-Lease', -75, 3),
-        ('Set clinic launch KPIs and success metrics', 'Strategic Growth', 'Post-Lease', -60, 4),
-        ('Create grand opening event strategy', 'Strategic Growth', '30 Days Out', -30, 5),
-        ('Post-opening growth review (30 days)', 'Strategic Growth', 'Post-Opening', 30, 6),
-    ]
     # Marketing
     tasks += [
         # After Lease Signed
