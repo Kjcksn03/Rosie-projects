@@ -71,6 +71,8 @@
             <th>Doctor Status</th>
             <th>Opening Date</th>
             <th>Ops Onsite</th>
+            <th>Buildout Cost</th>
+            <th>Cost to VIP</th>
             <th>Notes</th>
             <th></th>
           </tr>
@@ -95,6 +97,8 @@
             </td>
             <td>{{ c.opening_date or '—' }}</td>
             <td>{{ c.ops_onsite_member or '—' }}</td>
+            <td style="font-size:.82rem;">{{ c.total_buildout_cost or '—' }}</td>
+            <td style="font-size:.82rem;">{{ c.cost_to_vip or '—' }}</td>
             <td style="max-width:200px;font-size:.82rem;">{{ (c.clinic_notes or '')[:80] }}{% if c.clinic_notes and c.clinic_notes|length > 80 %}…{% endif %}</td>
             <td>
               <a href="{{ url_for('clinic_dashboard', clinic_id=c.id) }}" class="btn btn-secondary btn-sm" style="white-space:nowrap;">View</a>

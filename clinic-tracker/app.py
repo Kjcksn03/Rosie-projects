@@ -242,7 +242,8 @@ def init_db():
             clinic_notes TEXT,
             photos_videos_link TEXT,
             lease_filename TEXT,
-            supply_checkin_filename TEXT
+            supply_checkin_filename TEXT,
+            lease_signed_date TEXT
         );
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -359,6 +360,7 @@ def init_db():
         ('data_analysis_summary', 'TEXT'), ('clinic_notes', 'TEXT'),
         ('photos_videos_link', 'TEXT'), ('lease_filename', 'TEXT'),
         ('supply_checkin_filename', 'TEXT'),
+        ('lease_signed_date', 'TEXT'),
     ]
     existing_cols = [row[1] for row in db.execute("PRAGMA table_info(clinics)").fetchall()]
     for col_name, col_type in new_clinic_cols:
@@ -854,6 +856,7 @@ def new_clinic():
         name = request.form.get('name', '').strip()
         opening_date = request.form.get('opening_date', '') or None
         state = request.form.get('state', '') or None
+        lease_signed_date = request.form.get('lease_signed_date', '' ) or None
         entity = request.form.get('entity', '') or None
         sg_pm = request.form.get('sg_project_manager', '') or None
         sg_onsite = request.form.get('sg_onsite_member', '') or None
@@ -937,6 +940,7 @@ def edit_clinic(clinic_id):
         opening_date = request.form.get('opening_date', '') or None
         state = request.form.get('state', '') or None
         entity = request.form.get('entity', '') or None
+        lease_signed_date = request.form.get('lease_signed_date', '' ) or None
         sg_pm = request.form.get('sg_project_manager', '') or None
         sg_onsite = request.form.get('sg_onsite_member', '') or None
         setup_week = request.form.get('setup_week', '') or None
@@ -1652,3 +1656,19 @@ else:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     with app.app_context():
         init_db()
+
+@app.route('/clinic/<int:clinic_id>/set-lease-date', methods=['POST'])
+@login_required
+def set_lease_date(clinic_id):
+    lease_date = request.form.get('lease_signed_date', '').strip()
+    if lease_date:
+        execute_db("UPDATE clinics SET lease_signed_date=? WHERE id=?", (lease_date, clinic_id))
+        # Auto-set due dates for After Lease Signed tasks to lease_date + 14 days
+        ld = datetime.strptime(lease_date, '%Y-%m-%d')
+        due = (ld + timedelta(days=14)).strftime('%Y-%m-%d')
+        execute_db(
+            "UPDATE tasks SET due_date=? WHERE clinic_id=? AND time_phase='After Lease Signed' AND due_date IS NULL",
+            (due, clinic_id)
+        )
+        flash('Lease signed date saved and task due dates updated!', 'success')
+    return redirect(url_for('clinic_dashboard', clinic_id=clinic_id))
