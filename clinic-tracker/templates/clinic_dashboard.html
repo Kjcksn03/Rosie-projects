@@ -18,7 +18,9 @@
     <div class="d-flex gap-2 flex-wrap">
       <a href="{{ url_for('clinic_tasks', clinic_id=clinic.id) }}" class="btn btn-primary">📋 View All Tasks</a>
       <a href="{{ url_for('quick_check', clinic_id=clinic.id) }}" class="btn btn-outline">🔍 Quick Check</a>
+      <a href="{{ url_for('lease_summary', clinic_id=clinic.id) }}" class="btn btn-outline">📋 Lease Summary</a>
       {% if session.role == 'admin' %}
+      <a href="{{ url_for('edit_clinic', clinic_id=clinic.id) }}" class="btn btn-gold">✏️ Edit Clinic</a>
       <a href="{{ url_for('new_task', clinic_id=clinic.id) }}" class="btn btn-gold">➕ Add Task</a>
       <form method="POST" action="{{ url_for('delete_clinic', clinic_id=clinic.id) }}" class="confirm-delete" style="display:inline">
         <button class="btn btn-danger btn-sm">🗑️ Delete</button>
@@ -50,6 +52,32 @@
       <div class="stat-label">Overdue</div>
     </div>
   </div>
+
+  <!-- Clinic Info Panel -->
+  {% if clinic.state or clinic.entity or clinic.sg_project_manager or clinic.site_status or clinic.opening_date %}
+  <div class="card mb-3" style="border-left:4px solid var(--gold,#c8a951);">
+    <div class="card-body" style="padding:1rem 1.25rem;">
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;font-size:.88rem;">
+        {% if clinic.state %}<span><strong>State:</strong> {{ clinic.state }}</span>{% endif %}
+        {% if clinic.entity %}<span><strong>Entity:</strong> {{ clinic.entity }}</span>{% endif %}
+        {% if clinic.sg_project_manager %}<span><strong>PM:</strong> {{ clinic.sg_project_manager }}</span>{% endif %}
+        {% if clinic.site_status %}<span><strong>Site Status:</strong> {{ clinic.site_status }}</span>{% endif %}
+        {% if clinic.doctor_status %}<span><strong>Doctor Status:</strong> {{ clinic.doctor_status }}</span>{% endif %}
+        {% if clinic.setup_week %}<span><strong>Set-Up Week:</strong> {{ clinic.setup_week }}</span>{% endif %}
+        {% if clinic.ops_onsite_member %}<span><strong>Ops Onsite:</strong> {{ clinic.ops_onsite_member }}</span>{% endif %}
+        {% if clinic.paired_clinic %}<span><strong>Paired Clinic:</strong> {{ clinic.paired_clinic }}</span>{% endif %}
+        {% if clinic.total_buildout_cost %}<span><strong>Buildout Cost:</strong> {{ clinic.total_buildout_cost }}</span>{% endif %}
+        {% if clinic.cost_to_vip %}<span><strong>Cost to VIP:</strong> {{ clinic.cost_to_vip }}</span>{% endif %}
+        {% if clinic.photos_videos_link %}<span><a href="{{ clinic.photos_videos_link }}" target="_blank">📷 Photos/Videos</a></span>{% endif %}
+        {% if clinic.lease_filename %}<span><a href="{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.lease_filename) }}" target="_blank">📄 Lease Doc</a></span>{% endif %}
+        {% if clinic.supply_checkin_filename %}<span><a href="{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.supply_checkin_filename) }}" target="_blank">📋 Supply Check-In</a></span>{% endif %}
+      </div>
+      {% if clinic.clinic_notes %}
+      <div style="margin-top:.6rem;font-size:.85rem;color:#555;"><strong>Notes:</strong> {{ clinic.clinic_notes }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Overall progress bar -->
   <div class="card mb-3">

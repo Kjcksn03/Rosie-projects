@@ -1,21 +1,24 @@
 import os
+import csv
 import sqlite3
 import json
 import re
 from datetime import datetime, timedelta
 from functools import wraps
+from io import StringIO
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask import (Flask, render_template, request, redirect, url_for,
-                   session, flash, jsonify, g, send_from_directory)
+                   session, flash, jsonify, g, send_from_directory, Response)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'vip-medical-dev-secret-2024')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB
 DATABASE = os.path.join(os.path.dirname(__file__), 'clinic_tracker.db')
 
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'txt'}
+ALLOWED_DOC_EXTENSIONS = {'pdf', 'xlsx', 'docx', 'doc', 'xls'}
 
 DEPARTMENTS = [
     'Strategic Growth', 'Marketing', 'IT', 'Inventory', 'Operations',
@@ -78,7 +81,25 @@ def init_db():
             status TEXT DEFAULT 'Active',
             created_by INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_template INTEGER DEFAULT 0
+            is_template INTEGER DEFAULT 0,
+            state TEXT,
+            entity TEXT,
+            sg_project_manager TEXT,
+            sg_onsite_member TEXT,
+            setup_week TEXT,
+            ops_onsite_member TEXT,
+            doctor_status TEXT,
+            site_status TEXT,
+            targeting_opening_month TEXT,
+            procedures_done_where TEXT,
+            paired_clinic TEXT,
+            total_buildout_cost TEXT,
+            cost_to_vip TEXT,
+            data_analysis_summary TEXT,
+            clinic_notes TEXT,
+            photos_videos_link TEXT,
+            lease_filename TEXT,
+            supply_checkin_filename TEXT
         );
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,7 +153,56 @@ def init_db():
             detail TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS lease_summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            clinic_id INTEGER UNIQUE NOT NULL,
+            landlord_name TEXT,
+            landlord_contact TEXT,
+            landlord_broker TEXT,
+            lease_start_date DATE,
+            lease_end_date DATE,
+            monthly_rent TEXT,
+            security_deposit TEXT,
+            ti_allowance TEXT,
+            rent_commencement_date DATE,
+            square_footage TEXT,
+            suite_unit TEXT,
+            building_address TEXT,
+            key_lease_terms TEXT,
+            attorney_name TEXT,
+            docusign_sent_to TEXT DEFAULT 'Matt Stearns - CFO',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (clinic_id) REFERENCES clinics(id)
+        );
     ''')
+    db.commit()
+
+    # Run migrations for existing databases
+    # Add new columns to clinics table if they don't exist
+    new_clinic_cols = [
+        ('state', 'TEXT'),
+        ('entity', 'TEXT'),
+        ('sg_project_manager', 'TEXT'),
+        ('sg_onsite_member', 'TEXT'),
+        ('setup_week', 'TEXT'),
+        ('ops_onsite_member', 'TEXT'),
+        ('doctor_status', 'TEXT'),
+        ('site_status', 'TEXT'),
+        ('targeting_opening_month', 'TEXT'),
+        ('procedures_done_where', 'TEXT'),
+        ('paired_clinic', 'TEXT'),
+        ('total_buildout_cost', 'TEXT'),
+        ('cost_to_vip', 'TEXT'),
+        ('data_analysis_summary', 'TEXT'),
+        ('clinic_notes', 'TEXT'),
+        ('photos_videos_link', 'TEXT'),
+        ('lease_filename', 'TEXT'),
+        ('supply_checkin_filename', 'TEXT'),
+    ]
+    existing_cols = [row[1] for row in db.execute("PRAGMA table_info(clinics)").fetchall()]
+    for col_name, col_type in new_clinic_cols:
+        if col_name not in existing_cols:
+            db.execute(f"ALTER TABLE clinics ADD COLUMN {col_name} {col_type}")
     db.commit()
 
     # Seed admin user
@@ -161,13 +231,11 @@ def seed_template_tasks(db, clinic_id):
     tasks = []
     # Strategic Growth
     tasks += [
-        # Scouting
         ('General demographic research on possible locations', 'Strategic Growth', 'Scouting', -150, 0),
         ('Start scouting - rank and prioritize locations from demographic research', 'Strategic Growth', 'Scouting', -150, 1),
         ('Visit locations of interest', 'Strategic Growth', 'Scouting', -150, 2),
         ('Pull demographics specific to each location (during scouting)', 'Strategic Growth', 'Scouting', -150, 3),
         ('Get scaled floor plan from landlords (3rd scouting)', 'Strategic Growth', 'Scouting', -150, 4),
-        # After Lease Signed
         ('Create marked up floor plan and work letter for landlords/contractors', 'Strategic Growth', 'After Lease Signed', -120, 5),
         ('Determine locations to send RFP (marked up floor plans)', 'Strategic Growth', 'After Lease Signed', -120, 6),
         ('Review proposals received back', 'Strategic Growth', 'After Lease Signed', -120, 7),
@@ -197,14 +265,12 @@ def seed_template_tasks(db, clinic_id):
         ('Determine PO box for checks', 'Strategic Growth', 'After Lease Signed', -120, 31),
         ('Confirm exam chair orders with Hill Beds', 'Strategic Growth', 'After Lease Signed', -120, 32),
         ('Send diplomas and medical licenses of doctors to marketing (request digital signature if new doctor)', 'Strategic Growth', 'After Lease Signed', -120, 33),
-        # 2 Months Before Opening
         ('Order ultrasound machines', 'Strategic Growth', '2 Months Before Opening', -60, 0),
         ('Send liability to general liability insurance (Tiffany G, Kelly Jackson)', 'Strategic Growth', '2 Months Before Opening', -60, 1),
         ('Review lease to understand all terms and services needed (cleaning, electricity, etc.)', 'Strategic Growth', '2 Months Before Opening', -60, 2),
         ('Confirm setup and first day plan (who sets up, who is there opening day)', 'Strategic Growth', '2 Months Before Opening', -60, 3),
         ('Send new clinic introduction and updates email', 'Strategic Growth', '2 Months Before Opening', -60, 4),
         ('Audit websites (coming soon page up, GMB created)', 'Strategic Growth', '2 Months Before Opening', -60, 5),
-        # 1 Month Before Opening
         ('Schedule fill tech for ultrasound setup', 'Strategic Growth', '1 Month Before Opening', -30, 0),
         ('Lease review (confirm everything clear)', 'Strategic Growth', '1 Month Before Opening', -30, 1),
         ('Confirm signage gets installed before first day', 'Strategic Growth', '1 Month Before Opening', -30, 2),
@@ -215,7 +281,6 @@ def seed_template_tasks(db, clinic_id):
         ('Confirm chair delivery time', 'Strategic Growth', '1 Month Before Opening', -30, 7),
         ('Audit websites and GMB for contact info', 'Strategic Growth', '1 Month Before Opening', -30, 8),
         ('Send construction updates email to staff', 'Strategic Growth', '1 Month Before Opening', -30, 9),
-        # 2 Weeks Before Opening
         ('Ask if any staff available to receive deliveries', 'Strategic Growth', '2 Weeks Before Opening', -14, 0),
         ('Make sure new door lock system is set up', 'Strategic Growth', '2 Weeks Before Opening', -14, 1),
         ('Send final construction updates', 'Strategic Growth', '2 Weeks Before Opening', -14, 2),
@@ -223,11 +288,9 @@ def seed_template_tasks(db, clinic_id):
         ('Schedule cleaners', 'Strategic Growth', '2 Weeks Before Opening', -14, 4),
         ('Hire handyman for furniture assembly/mounting', 'Strategic Growth', '2 Weeks Before Opening', -14, 5),
         ('Order furniture', 'Strategic Growth', '2 Weeks Before Opening', -14, 6),
-        # 1 Week Before Opening
         ('Make sure IT has door locks set up', 'Strategic Growth', '1 Week Before Opening', -7, 0),
         ('Make sure internet is set up', 'Strategic Growth', '1 Week Before Opening', -7, 1),
         ('Set up computers, iPads, ultrasounds', 'Strategic Growth', '1 Week Before Opening', -7, 2),
-        # Week Before Opening
         ('Update location lease summary', 'Strategic Growth', 'Week Before Opening', -5, 0),
         ('Take clinic videos and written directions (for call center and Hub)', 'Strategic Growth', 'Week Before Opening', -5, 1),
         ('Verify scanners, printers, and label printer functioning', 'Strategic Growth', 'Week Before Opening', -5, 2),
@@ -242,58 +305,45 @@ def seed_template_tasks(db, clinic_id):
         ('Send "Actions Needed" email to ROD (day before opening)', 'Strategic Growth', 'Week Before Opening', -5, 11),
         ('Send "Important Information for Your First Day" email to all staff at new clinic (day before opening)', 'Strategic Growth', 'Week Before Opening', -5, 12),
         ('Final lease review - make sure everything in lease summary and staff informed', 'Strategic Growth', 'Week Before Opening', -5, 13),
-        # Opening Day
         ('Send email to accounting with asset list (exam chairs, ultrasound, major assets now in use)', 'Strategic Growth', 'Opening Day', 0, 0),
-        # 1 Week After Opening
         ('Send first week check-in email to ROD', 'Strategic Growth', '1 Week After Opening', 7, 0),
-        # 1 Month After Opening
         ('Send first month check-in email to ROD', 'Strategic Growth', '1 Month After Opening', 30, 0),
     ]
     # Marketing
     tasks += [
-        # After Lease Signed
         ('Prepare building signage', 'Marketing', 'After Lease Signed', -120, 0),
         ('Create print materials', 'Marketing', 'After Lease Signed', -120, 1),
         ('Coordinate photo shoot of new doctor with Carly', 'Marketing', 'After Lease Signed', -120, 2),
         ('Set up GMB, Yelp, Apple Maps, Bing pages', 'Marketing', 'After Lease Signed', -120, 3),
         ('Set up all websites and microsites', 'Marketing', 'After Lease Signed', -120, 4),
-        # 2 Months Before Opening
         ('Verify GMB page is set up correctly and working', 'Marketing', '2 Months Before Opening', -60, 0),
         ('Update marketing tab on supply check-in sheet (confirm quantities and supplies correct for this clinic)', 'Marketing', '2 Months Before Opening', -60, 1),
-        # 1 Month Before Opening
-        ('Create ads (don\'t start them yet)', 'Marketing', '1 Month Before Opening', -30, 0),
+        ("Create ads (don't start them yet)", 'Marketing', '1 Month Before Opening', -30, 0),
         ('Add clinic information to website, microsites, and GMB', 'Marketing', '1 Month Before Opening', -30, 1),
         ('Order marketing supplies from Ops based on supply check-in sheet', 'Marketing', '1 Month Before Opening', -30, 2),
-        # 2 Weeks Before Opening
         ('Turn on ads', 'Marketing', '2 Weeks Before Opening', -14, 0),
         ('Make sure signs are installed', 'Marketing', '2 Weeks Before Opening', -14, 1),
-        # 1 Month After Opening
         ('Send marketing materials feedback form', 'Marketing', '1 Month After Opening', 30, 0),
     ]
     # IT
     tasks += [
-        # After Lease Signed
         ('Determine IT setup plan and communicate to Strategic Growth', 'IT', 'After Lease Signed', -120, 0),
-        # 2 Months Before Opening
         ('Schedule internet setup', 'IT', '2 Months Before Opening', -60, 0),
         ('Order tech items and arrange delivery', 'IT', '2 Months Before Opening', -60, 1),
         ('Confirm internet setup dates with Strategic Growth team', 'IT', '2 Months Before Opening', -60, 2),
-        # 1 Month Before Opening
         ('Create NextTech elements and clinic ops check', 'IT', '1 Month Before Opening', -30, 0),
         ('Link digital signature to NextTech', 'IT', '1 Month Before Opening', -30, 1),
         ('Generate provider profile in NextTech', 'IT', '1 Month Before Opening', -30, 2),
-        ('Access provider\'s account and add signature as default signature (with date)', 'IT', '1 Month Before Opening', -30, 3),
+        ("Access provider's account and add signature as default signature (with date)", 'IT', '1 Month Before Opening', -30, 3),
         ('Change preferences to automatically change status of eMins signed to "Sign by Provider"', 'IT', '1 Month Before Opening', -30, 4),
         ('Add new location to NextTech (ASC or regular location)', 'IT', '1 Month Before Opening', -30, 5),
         ('EMR setup: add provider info to ultrasound note', 'IT', '1 Month Before Opening', -30, 6),
-        # 1 Week Before Opening
         ('Set up ultrasounds, TVs, iPads, Sonos, security cameras, and computers', 'IT', '1 Week Before Opening', -7, 0),
         ('Designate person to be on call for first day', 'IT', '1 Week Before Opening', -7, 1),
         ('Add location to facility/badge access system', 'IT', '1 Week Before Opening', -7, 2),
     ]
     # Inventory
     tasks += [
-        # 1 Month Before Opening
         ('Set up Medtronic account', 'Inventory', '1 Month Before Opening', -30, 0),
         ('Set up Besse account', 'Inventory', '1 Month Before Opening', -30, 1),
         ('Set up McKesson account', 'Inventory', '1 Month Before Opening', -30, 2),
@@ -305,72 +355,54 @@ def seed_template_tasks(db, clinic_id):
         ('Set up Stericycle account', 'Inventory', '1 Month Before Opening', -30, 8),
         ('Set up Water Cooler Company account', 'Inventory', '1 Month Before Opening', -30, 9),
         ('Order supplies from supply check-in sheet', 'Inventory', '1 Month Before Opening', -30, 10),
-        # 1 Week Before Opening
         ('Add expiration dates for emergency meds to system', 'Inventory', '1 Week Before Opening', -7, 0),
         ('Determine who will be doing inventory for this location', 'Inventory', '1 Week Before Opening', -7, 1),
-        # Week Before Opening
         ('Finalize with Strategic Growth that all initial supplies were received and transitioning to formal inventory orders', 'Inventory', 'Week Before Opening', -5, 0),
-        # 1 Month After Opening
         ('Order any additional items requested during opening week (items added to supply check-in sheet during opening)', 'Inventory', '1 Month After Opening', 30, 0),
     ]
     # Operations
     tasks += [
-        # After Lease Signed
         ('Create emergency number for the doctors', 'Operations', 'After Lease Signed', -120, 0),
         ('Send New Location Alert to all teams (call center, scheduling, verifications, patient coordinators, RCM, etc.)', 'Operations', 'After Lease Signed', -120, 1),
-        ('Update the Hub - doctor info up to date and clinic linked to doctor\'s site', 'Operations', 'After Lease Signed', -120, 2),
+        ("Update the Hub - doctor info up to date and clinic linked to doctor's site", 'Operations', 'After Lease Signed', -120, 2),
         ('Create site for new clinic on the Hub', 'Operations', 'After Lease Signed', -120, 3),
         ('Update schedules on Hub', 'Operations', 'After Lease Signed', -120, 4),
         ('Create Medwork location - NextTech mapping', 'Operations', 'After Lease Signed', -120, 5),
         ('Create Medwork location - Medwork 1.0 and 2.0', 'Operations', 'After Lease Signed', -120, 6),
         ('Create front desk email', 'Operations', 'After Lease Signed', -120, 7),
-        # 1 Month Before Opening
         ('Add location to ClearWave', 'Operations', '1 Month Before Opening', -30, 0),
         ('Add schedule to Hub', 'Operations', '1 Month Before Opening', -30, 1),
         ('Confirm schedule is open', 'Operations', '1 Month Before Opening', -30, 2),
         ('Add location and doctor to Luma', 'Operations', '1 Month Before Opening', -30, 3),
-        # 1 Week Before Opening
         ('Test check-in workflows with mock patient', 'Operations', '1 Week Before Opening', -7, 0),
         ('Determine key needs and make appropriate copies', 'Operations', '1 Week Before Opening', -7, 1),
-        # 1 Week After Opening
         ('Determine opening and closing protocols', 'Operations', '1 Week After Opening', 7, 0),
-        # 1 Month After Opening
         ('Run new clinic audit', 'Operations', '1 Month After Opening', 30, 0),
         ('One month check', 'Operations', '1 Month After Opening', 30, 1),
-        # 2 Months After Opening
         ('Two month check', 'Operations', '2 Months After Opening', 60, 0),
-        # 3 Months After Opening
         ('Three month check', 'Operations', '3 Months After Opening', 90, 0),
     ]
     # Accounting / Accounts Payable
     tasks += [
-        # After Lease Signed
         ('Confirm rent payment is set up', 'Accounting / Accounts Payable', 'After Lease Signed', -120, 0),
         ('Confirm security deposit is sent out', 'Accounting / Accounts Payable', 'After Lease Signed', -120, 1),
-        # 1 Month Before Opening
         ('Add clinic to check management protocol ClickUp space (https://app.clickup.com/t/86dzk45rq)', 'Accounting / Accounts Payable', '1 Month Before Opening', -30, 0),
     ]
     # Credentialing
     tasks += [
-        # When New Provider Hired
         ('Send welcome email to new provider and start collecting credentialing documents', 'Credentialing', 'When New Provider Hired', 0, 0),
-        # After Lease Signed
         ('Initiate out-of-network linking to PPO plans', 'Credentialing', 'After Lease Signed', -120, 0),
         ('Start credentialing enrollment for HMOs (if applicable, e.g. California)', 'Credentialing', 'After Lease Signed', -120, 1),
         ('Start Medicare credentialing enrollment for the provider', 'Credentialing', 'After Lease Signed', -120, 2),
-        # 1 Week Before Opening
         ('Confirm what plans the provider is fully linked with and participating in', 'Credentialing', '1 Week Before Opening', -7, 0),
         ('Share confirmed plan participation with Operations and Strategic Growth', 'Credentialing', '1 Week Before Opening', -7, 1),
     ]
     # RODs & Clinic Leads
     tasks += [
-        # After Lease Signed
         ('Determine if this will be a virtual front desk location; inform Strategic Growth', 'RODs & Clinic Leads', 'After Lease Signed', -120, 0),
         ('Hire new staff and start new staff training (if not started beforehand)', 'RODs & Clinic Leads', 'After Lease Signed', -120, 1),
         ('Verify that front desk, office staff, and MAs can be hired and trained in time; confirm with Strategic Growth that opening date is feasible', 'RODs & Clinic Leads', 'After Lease Signed', -120, 2),
-        # 1 Month Before Opening
         ('Set up ultrasound training for staff', 'RODs & Clinic Leads', '1 Month Before Opening', -30, 0),
-        # Opening Day
         ('Check out proper keys and key cards to each staff member; keep a list of who has what keys/key cards', 'RODs & Clinic Leads', 'Opening Day', 0, 0),
         ('Do Unified door training (how to arm/disarm alarm, set door open for certain hours, re-lock, use Unified door system)', 'RODs & Clinic Leads', 'Opening Day', 0, 1),
         ('Confirm iPads are logged into correct accounts and working', 'RODs & Clinic Leads', 'Opening Day', 0, 2),
@@ -378,25 +410,23 @@ def seed_template_tasks(db, clinic_id):
         ('Walk through waiting area — check cleanliness and seating before opening to patients', 'RODs & Clinic Leads', 'Opening Day', 0, 4),
         ('Ensure downtime packets are printed and accessible (in case internet goes down)', 'RODs & Clinic Leads', 'Opening Day', 0, 5),
         ('Observe patient check-in process and give feedback', 'RODs & Clinic Leads', 'Opening Day', 0, 6),
-        ('Shadow provider\'s first consult — observe and give feedback', 'RODs & Clinic Leads', 'Opening Day', 0, 7),
+        ("Shadow provider's first consult — observe and give feedback", 'RODs & Clinic Leads', 'Opening Day', 0, 7),
         ('Confirm patient movement flow is smooth (waiting room → scan → provider → checkout)', 'RODs & Clinic Leads', 'Opening Day', 0, 8),
         ('Identify any bottlenecks or delays and address them', 'RODs & Clinic Leads', 'Opening Day', 0, 9),
         ('Provide breakfast for the team on the first day', 'RODs & Clinic Leads', 'Opening Day', 0, 10),
         ('Hold team huddle at start of day (front desk, sonographers, provider)', 'RODs & Clinic Leads', 'Opening Day', 0, 11),
         ('Review processes with front desk — ensure they can apply training and are ready', 'RODs & Clinic Leads', 'Opening Day', 0, 12),
         ('Print out Mercy Manual and put in red binder', 'RODs & Clinic Leads', 'Opening Day', 0, 13),
-        ('Ensure everyone in clinic knows where Mercy Kit is located and what\'s in it', 'RODs & Clinic Leads', 'Opening Day', 0, 14),
+        ("Ensure everyone in clinic knows where Mercy Kit is located and what's in it", 'RODs & Clinic Leads', 'Opening Day', 0, 14),
         ('Get safe set up and go over safe protocol', 'RODs & Clinic Leads', 'Opening Day', 0, 15),
-        # 1 Week After Opening
         ('Finish receiving and checking in all deliveries on supply check-in sheet', 'RODs & Clinic Leads', '1 Week After Opening', 7, 0),
-        ('Identify any additional supplies needed that haven\'t been ordered; add to supply check-in sheet', 'RODs & Clinic Leads', '1 Week After Opening', 7, 1),
+        ("Identify any additional supplies needed that haven't been ordered; add to supply check-in sheet", 'RODs & Clinic Leads', '1 Week After Opening', 7, 1),
         ('Verify daily ultrasound images are uploading consistently to PACS', 'RODs & Clinic Leads', '1 Week After Opening', 7, 2),
         ('Audit image quality', 'RODs & Clinic Leads', '1 Week After Opening', 7, 3),
         ('Confirm cleaning staff schedule and that clinic team knows when they come in', 'RODs & Clinic Leads', '1 Week After Opening', 7, 4),
         ('Review supply inventory process, how to use inventory sheet, and how to reorder supplies with clinic team', 'RODs & Clinic Leads', '1 Week After Opening', 7, 5),
         ('Confirm consents are being completed properly in NextTech', 'RODs & Clinic Leads', '1 Week After Opening', 7, 6),
         ('Provide summary of first week observations to Strategic Growth (feedback on improvements)', 'RODs & Clinic Leads', '1 Week After Opening', 7, 7),
-        # 1 Month After Opening
         ('Review patient feedback and wait times', 'RODs & Clinic Leads', '1 Month After Opening', 30, 0),
         ('Confirm techs are using correct measurements and protocols', 'RODs & Clinic Leads', '1 Month After Opening', 30, 1),
         ('Review abnormal studies with providers', 'RODs & Clinic Leads', '1 Month After Opening', 30, 2),
@@ -405,13 +435,11 @@ def seed_template_tasks(db, clinic_id):
     ]
     # Malpractice
     tasks += [
-        # After Lease Signed
         ('Create new malpractice insurance for the new provider with the correct new location (if new provider)', 'Malpractice', 'After Lease Signed', -120, 0),
-        ('Add the new location to the provider\'s COI - Certificate of Insurance (if existing provider)', 'Malpractice', 'After Lease Signed', -120, 1),
+        ("Add the new location to the provider's COI - Certificate of Insurance (if existing provider)", 'Malpractice', 'After Lease Signed', -120, 1),
     ]
     # Special Operations
     tasks += [
-        # After Lease Signed
         ('Update ClickUp MR mapping', 'Special Operations', 'After Lease Signed', -120, 0),
         ('Update ClickUp Insurance Billing mapping', 'Special Operations', 'After Lease Signed', -120, 1),
         ('Update Saturation Report', 'Special Operations', 'After Lease Signed', -120, 2),
@@ -424,7 +452,6 @@ def seed_template_tasks(db, clinic_id):
         ('Update Conservative Report', 'Special Operations', 'After Lease Signed', -120, 9),
         ('Update Reconciliation Report', 'Special Operations', 'After Lease Signed', -120, 10),
         ('Update Productivity mapping', 'Special Operations', 'After Lease Signed', -120, 11),
-        # 1 Month Before Opening
         ('Set up data reports', 'Special Operations', '1 Month Before Opening', -30, 0),
         ('Ramp up update', 'Special Operations', '1 Month Before Opening', -30, 1),
         ('Opening date setup', 'Special Operations', '1 Month Before Opening', -30, 2),
@@ -437,26 +464,19 @@ def seed_template_tasks(db, clinic_id):
     ]
     # Referrals Outreach
     tasks += [
-        # Scouting
         ('Begin referral outreach in areas being considered for new location', 'Referrals Outreach', 'Scouting', -150, 0),
-        # 2 Months Before Opening
         ('Build lead sourcing plan', 'Referrals Outreach', '2 Months Before Opening', -60, 0),
         ('Finalize top lead short list', 'Referrals Outreach', '2 Months Before Opening', -60, 1),
-        # 1 Month Before Opening
         ('Launch outreach', 'Referrals Outreach', '1 Month Before Opening', -30, 0),
         ('Activation check: establish partnerships + first referral watch + 45 days', 'Referrals Outreach', '1 Month Before Opening', -30, 1),
         ('Share short list with Regional Operations Directors for site visit', 'Referrals Outreach', '1 Month Before Opening', -30, 2),
-        # 1 Week Before Opening
         ('Send opening announcement touch to top targets (logged in HubSpot)', 'Referrals Outreach', '1 Week Before Opening', -7, 0),
         ('Order opening day marketing materials for referrals', 'Referrals Outreach', '1 Week Before Opening', -7, 1),
     ]
     # HR
     tasks += [
-        # After Lease Signed
         ('Add new location to Rippling', 'HR', 'After Lease Signed', -120, 0),
-        # 1 Month Before Opening
         ('Order HR compliance posters (to be delivered the week before opening)', 'HR', '1 Month Before Opening', -30, 0),
-        # When New Provider Hired
         ('Add any new staff to this location in Rippling', 'HR', 'When New Provider Hired', 0, 0),
     ]
 
@@ -509,6 +529,9 @@ app.jinja_env.filters['from_json'] = json.loads
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def allowed_doc_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_DOC_EXTENSIONS
+
 def notify_user(user_id, message, link=None):
     execute_db("INSERT INTO notifications (user_id, message, link) VALUES (?,?,?)",
                (user_id, message, link))
@@ -529,6 +552,31 @@ def can_edit_task(user, task):
         if str(user['id']) in [str(a) for a in assignees]:
             return True
     return False
+
+def get_quarter(date_str):
+    """Return Q1-Q4 string for a date string YYYY-MM-DD, or None."""
+    if not date_str:
+        return None
+    try:
+        dt = datetime.strptime(date_str, '%Y-%m-%d')
+        q = (dt.month - 1) // 3 + 1
+        return f'Q{q} {dt.year}'
+    except Exception:
+        return None
+
+def save_clinic_document(file_obj, clinic_id, doc_type):
+    """Save a clinic document. Returns saved filename or None."""
+    if not file_obj or not file_obj.filename:
+        return None
+    if not allowed_doc_file(file_obj.filename):
+        return None
+    upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'clinics', str(clinic_id))
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = secure_filename(file_obj.filename)
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    saved_name = f'{doc_type}_{timestamp}_{filename}'
+    file_obj.save(os.path.join(upload_dir, saved_name))
+    return saved_name
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
@@ -572,15 +620,54 @@ def index():
 def new_clinic():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
-        opening_date = request.form.get('opening_date', '')
+        opening_date = request.form.get('opening_date', '') or None
+        state = request.form.get('state', '') or None
+        entity = request.form.get('entity', '') or None
+        sg_pm = request.form.get('sg_project_manager', '') or None
+        sg_onsite = request.form.get('sg_onsite_member', '') or None
+        setup_week = request.form.get('setup_week', '') or None
+        ops_onsite = request.form.get('ops_onsite_member', '') or None
+        doctor_status = request.form.get('doctor_status', '') or None
+        site_status = request.form.get('site_status', '') or None
+        targeting_month = request.form.get('targeting_opening_month', '') or None
+        procedures_done_where = request.form.get('procedures_done_where', '') or None
+        paired_clinic = request.form.get('paired_clinic', '') or None
+        total_buildout_cost = request.form.get('total_buildout_cost', '') or None
+        cost_to_vip = request.form.get('cost_to_vip', '') or None
+        data_analysis = request.form.get('data_analysis_summary', '') or None
+        clinic_notes = request.form.get('clinic_notes', '') or None
+        photos_link = request.form.get('photos_videos_link', '') or None
+
         if not name:
             flash('Clinic name is required.', 'error')
             return render_template('new_clinic.html')
-        # Create clinic
+
         clinic_id = execute_db(
-            "INSERT INTO clinics (name, opening_date, created_by) VALUES (?,?,?)",
-            (name, opening_date or None, session['user_id'])
+            '''INSERT INTO clinics (name, opening_date, created_by, state, entity,
+               sg_project_manager, sg_onsite_member, setup_week, ops_onsite_member,
+               doctor_status, site_status, targeting_opening_month, procedures_done_where,
+               paired_clinic, total_buildout_cost, cost_to_vip, data_analysis_summary,
+               clinic_notes, photos_videos_link)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (name, opening_date, session['user_id'], state, entity,
+             sg_pm, sg_onsite, setup_week, ops_onsite,
+             doctor_status, site_status, targeting_month, procedures_done_where,
+             paired_clinic, total_buildout_cost, cost_to_vip, data_analysis,
+             clinic_notes, photos_link)
         )
+
+        # Handle file uploads
+        lease_file = request.files.get('lease_file')
+        supply_file = request.files.get('supply_checkin_file')
+        if lease_file and lease_file.filename:
+            saved = save_clinic_document(lease_file, clinic_id, 'lease')
+            if saved:
+                execute_db("UPDATE clinics SET lease_filename=? WHERE id=?", (saved, clinic_id))
+        if supply_file and supply_file.filename:
+            saved = save_clinic_document(supply_file, clinic_id, 'supply')
+            if saved:
+                execute_db("UPDATE clinics SET supply_checkin_filename=? WHERE id=?", (saved, clinic_id))
+
         # Copy template tasks
         tmpl = query_db("SELECT * FROM clinics WHERE is_template=1", one=True)
         if tmpl:
@@ -601,6 +688,64 @@ def new_clinic():
         return redirect(url_for('clinic_dashboard', clinic_id=clinic_id))
     return render_template('new_clinic.html')
 
+@app.route('/clinic/<int:clinic_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_clinic(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip() or clinic['name']
+        opening_date = request.form.get('opening_date', '') or None
+        state = request.form.get('state', '') or None
+        entity = request.form.get('entity', '') or None
+        sg_pm = request.form.get('sg_project_manager', '') or None
+        sg_onsite = request.form.get('sg_onsite_member', '') or None
+        setup_week = request.form.get('setup_week', '') or None
+        ops_onsite = request.form.get('ops_onsite_member', '') or None
+        doctor_status = request.form.get('doctor_status', '') or None
+        site_status = request.form.get('site_status', '') or None
+        targeting_month = request.form.get('targeting_opening_month', '') or None
+        procedures_done_where = request.form.get('procedures_done_where', '') or None
+        paired_clinic = request.form.get('paired_clinic', '') or None
+        total_buildout_cost = request.form.get('total_buildout_cost', '') or None
+        cost_to_vip = request.form.get('cost_to_vip', '') or None
+        data_analysis = request.form.get('data_analysis_summary', '') or None
+        clinic_notes = request.form.get('clinic_notes', '') or None
+        photos_link = request.form.get('photos_videos_link', '') or None
+
+        execute_db(
+            '''UPDATE clinics SET name=?, opening_date=?, state=?, entity=?,
+               sg_project_manager=?, sg_onsite_member=?, setup_week=?, ops_onsite_member=?,
+               doctor_status=?, site_status=?, targeting_opening_month=?,
+               procedures_done_where=?, paired_clinic=?, total_buildout_cost=?, cost_to_vip=?,
+               data_analysis_summary=?, clinic_notes=?, photos_videos_link=?
+               WHERE id=?''',
+            (name, opening_date, state, entity,
+             sg_pm, sg_onsite, setup_week, ops_onsite,
+             doctor_status, site_status, targeting_month,
+             procedures_done_where, paired_clinic, total_buildout_cost, cost_to_vip,
+             data_analysis, clinic_notes, photos_link, clinic_id)
+        )
+
+        # Handle file uploads (only update if new file provided)
+        lease_file = request.files.get('lease_file')
+        supply_file = request.files.get('supply_checkin_file')
+        if lease_file and lease_file.filename:
+            saved = save_clinic_document(lease_file, clinic_id, 'lease')
+            if saved:
+                execute_db("UPDATE clinics SET lease_filename=? WHERE id=?", (saved, clinic_id))
+        if supply_file and supply_file.filename:
+            saved = save_clinic_document(supply_file, clinic_id, 'supply')
+            if saved:
+                execute_db("UPDATE clinics SET supply_checkin_filename=? WHERE id=?", (saved, clinic_id))
+
+        log_activity(clinic_id, None, session['user_id'], 'Clinic Updated', name)
+        flash(f'Clinic "{name}" updated successfully!', 'success')
+        return redirect(url_for('clinic_dashboard', clinic_id=clinic_id))
+    return render_template('edit_clinic.html', clinic=clinic)
+
 @app.route('/clinic/<int:clinic_id>')
 @login_required
 def clinic_dashboard(clinic_id):
@@ -609,7 +754,6 @@ def clinic_dashboard(clinic_id):
         flash('Clinic not found.', 'error')
         return redirect(url_for('index'))
     tasks = query_db("SELECT * FROM tasks WHERE clinic_id=? ORDER BY department, template_offset_days, order_index", [clinic_id])
-    # Build department stats
     dept_stats = {}
     for dept in DEPARTMENTS:
         dept_tasks = [t for t in tasks if t['department'] == dept]
@@ -732,7 +876,6 @@ def task_detail(task_id):
             if old_status != status:
                 log_activity(task['clinic_id'], task_id, session['user_id'],
                              'Status Changed', f'{old_status} → {status}')
-                # Notify assignees of status change
                 for uid in json.loads(assignees):
                     if int(uid) != session['user_id']:
                         notify_user(int(uid), f'Task "{name}" status changed to {status}',
@@ -747,7 +890,6 @@ def task_detail(task_id):
                            (task_id, session['user_id'], content))
                 log_activity(task['clinic_id'], task_id, session['user_id'],
                              'Note Added', content[:80])
-                # @mention notifications
                 mentions = re.findall(r'@(\w+)', content)
                 for username in mentions:
                     mentioned = query_db("SELECT id FROM users WHERE username=?", [username], one=True)
@@ -755,7 +897,6 @@ def task_detail(task_id):
                         notify_user(mentioned['id'],
                                    f'{user["full_name"]} mentioned you in task "{task["name"]}"',
                                    f'/task/{task_id}')
-                # Notify department members (dept_head or members in that dept)
                 dept_users = query_db(
                     "SELECT id FROM users WHERE department=? AND id != ?",
                     [task['department'], session['user_id']])
@@ -795,6 +936,124 @@ def task_detail(task_id):
 @login_required
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/clinic-uploads/<int:clinic_id>/<filename>')
+@login_required
+def clinic_uploaded_file(clinic_id, filename):
+    upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'clinics', str(clinic_id))
+    return send_from_directory(upload_dir, filename)
+
+# ─── Lease Summary ────────────────────────────────────────────────────────────
+
+@app.route('/clinic/<int:clinic_id>/lease-summary', methods=['GET', 'POST'])
+@login_required
+def lease_summary(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [clinic_id], one=True)
+
+    if request.method == 'POST':
+        fields = {
+            'landlord_name': request.form.get('landlord_name', '') or None,
+            'landlord_contact': request.form.get('landlord_contact', '') or None,
+            'landlord_broker': request.form.get('landlord_broker', '') or None,
+            'lease_start_date': request.form.get('lease_start_date', '') or None,
+            'lease_end_date': request.form.get('lease_end_date', '') or None,
+            'monthly_rent': request.form.get('monthly_rent', '') or None,
+            'security_deposit': request.form.get('security_deposit', '') or None,
+            'ti_allowance': request.form.get('ti_allowance', '') or None,
+            'rent_commencement_date': request.form.get('rent_commencement_date', '') or None,
+            'square_footage': request.form.get('square_footage', '') or None,
+            'suite_unit': request.form.get('suite_unit', '') or None,
+            'building_address': request.form.get('building_address', '') or None,
+            'key_lease_terms': request.form.get('key_lease_terms', '') or None,
+            'attorney_name': request.form.get('attorney_name', '') or None,
+            'docusign_sent_to': request.form.get('docusign_sent_to', 'Matt Stearns - CFO') or 'Matt Stearns - CFO',
+        }
+        if lease:
+            sets = ', '.join(f'{k}=?' for k in fields.keys())
+            execute_db(f"UPDATE lease_summaries SET {sets}, updated_at=CURRENT_TIMESTAMP WHERE clinic_id=?",
+                       list(fields.values()) + [clinic_id])
+        else:
+            cols = ', '.join(fields.keys())
+            placeholders = ', '.join('?' for _ in fields)
+            execute_db(f"INSERT INTO lease_summaries (clinic_id, {cols}) VALUES (?, {placeholders})",
+                       [clinic_id] + list(fields.values()))
+        flash('Lease summary saved.', 'success')
+        return redirect(url_for('lease_summary', clinic_id=clinic_id))
+
+    lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [clinic_id], one=True)
+    return render_template('lease_summary.html', clinic=clinic, lease=lease)
+
+# ─── Pipeline Tracker ─────────────────────────────────────────────────────────
+
+@app.route('/pipeline')
+@login_required
+def pipeline():
+    status_filter = request.args.get('status', '')
+    pm_filter = request.args.get('pm', '')
+    state_filter = request.args.get('state', '')
+
+    q = "SELECT * FROM clinics WHERE is_template=0"
+    args = []
+    if status_filter:
+        q += " AND site_status=?"; args.append(status_filter)
+    if pm_filter:
+        q += " AND sg_project_manager=?"; args.append(pm_filter)
+    if state_filter:
+        q += " AND state=?"; args.append(state_filter)
+    q += " ORDER BY opening_date ASC NULLS LAST, name ASC"
+    clinics = query_db(q, args)
+
+    # Group by quarter
+    quarters = {}
+    for c in clinics:
+        q_label = get_quarter(c['opening_date']) or 'No Date Set'
+        if q_label not in quarters:
+            quarters[q_label] = []
+        quarters[q_label].append(dict(c))
+
+    # Sort quarters: put real quarters first, then "No Date Set"
+    def quarter_sort_key(k):
+        if k == 'No Date Set':
+            return '9999'
+        parts = k.split(' ')  # e.g. ['Q2', '2025']
+        return f"{parts[1]}_{parts[0]}" if len(parts) == 2 else k
+    sorted_quarters = dict(sorted(quarters.items(), key=lambda x: quarter_sort_key(x[0])))
+
+    # Get unique filter values
+    all_clinics_raw = query_db("SELECT DISTINCT site_status, sg_project_manager, state FROM clinics WHERE is_template=0")
+    statuses_avail = sorted(set(c['site_status'] for c in all_clinics_raw if c['site_status']))
+    pms_avail = sorted(set(c['sg_project_manager'] for c in all_clinics_raw if c['sg_project_manager']))
+    states_avail = sorted(set(c['state'] for c in all_clinics_raw if c['state']))
+
+    return render_template('pipeline.html',
+        quarters=sorted_quarters, clinics=clinics,
+        statuses_avail=statuses_avail, pms_avail=pms_avail, states_avail=states_avail,
+        status_filter=status_filter, pm_filter=pm_filter, state_filter=state_filter)
+
+@app.route('/pipeline/export-csv')
+@login_required
+def pipeline_export_csv():
+    clinics = query_db("SELECT * FROM clinics WHERE is_template=0 ORDER BY opening_date ASC NULLS LAST, name ASC")
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['Clinic Name', 'State', 'Entity', 'PM', 'Site Status', 'Set Up Week',
+                     'Doctor Status', 'Opening Date', 'Ops Onsite Member', 'Targeting Month', 'Notes'])
+    for c in clinics:
+        writer.writerow([
+            c['name'], c['state'] or '', c['entity'] or '', c['sg_project_manager'] or '',
+            c['site_status'] or '', c['setup_week'] or '', c['doctor_status'] or '',
+            c['opening_date'] or '', c['ops_onsite_member'] or '',
+            c['targeting_opening_month'] or '', c['clinic_notes'] or ''
+        ])
+    output = si.getvalue()
+    return Response(output, mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment;filename=pipeline_tracker.csv'})
+
+# ─── Notifications & misc ─────────────────────────────────────────────────────
 
 @app.route('/notifications')
 @login_required
@@ -911,11 +1170,12 @@ def delete_clinic(clinic_id):
         execute_db("DELETE FROM attachments WHERE task_id IN (SELECT id FROM tasks WHERE clinic_id=?)", [clinic_id])
         execute_db("DELETE FROM tasks WHERE clinic_id=?", [clinic_id])
         execute_db("DELETE FROM activity_log WHERE clinic_id=?", [clinic_id])
+        execute_db("DELETE FROM lease_summaries WHERE clinic_id=?", [clinic_id])
         execute_db("DELETE FROM clinics WHERE id=?", [clinic_id])
         flash(f'Clinic "{clinic["name"]}" deleted.', 'success')
     return redirect(url_for('index'))
 
-# ─── Due-date notifications check (called on each request for simplicity) ────
+# ─── Due-date notifications check ────────────────────────────────────────────
 
 @app.before_request
 def check_due_notifications():
@@ -923,21 +1183,18 @@ def check_due_notifications():
         return
     if not request.endpoint or request.endpoint in ('static', 'notif_count'):
         return
-    # Check once per session per day
     last_check = session.get('due_check_date')
     today = datetime.now().strftime('%Y-%m-%d')
     if last_check == today:
         return
     session['due_check_date'] = today
     uid = session['user_id']
-    # Tasks assigned to user due within 3 days
     three_days = (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d')
     due_tasks = query_db(
         '''SELECT t.* FROM tasks t WHERE t.due_date <= ? AND t.due_date >= ?
            AND t.status NOT IN ('Complete') AND t.assignees LIKE ?''',
         [three_days, today, f'%{uid}%'])
     for t in due_tasks:
-        # Avoid duplicate notifications
         existing = query_db(
             "SELECT id FROM notifications WHERE user_id=? AND message LIKE ? AND created_at >= date('now', '-1 day')",
             [uid, f'%{t["name"]}%'], one=True)

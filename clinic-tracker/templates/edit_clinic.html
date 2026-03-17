@@ -1,11 +1,14 @@
 {% extends "base.html" %}
-{% block title %}New Clinic | VIP Medical Group{% endblock %}
+{% block title %}Edit {{ clinic.name }} | VIP Medical Group{% endblock %}
 {% block content %}
 <div class="container" style="max-width:860px;margin:2rem auto;padding:0 1rem;">
   <div class="card">
-    <div class="card-header" style="background:var(--navy);color:#fff;padding:1.25rem 1.5rem;border-radius:8px 8px 0 0;">
-      <h2 style="margin:0;font-size:1.4rem;">➕ New Clinic Launch</h2>
-      <p style="margin:.25rem 0 0;opacity:.8;font-size:.9rem;">Fill out all sections to create a new clinic from the master template.</p>
+    <div class="card-header" style="background:var(--navy);color:#fff;padding:1.25rem 1.5rem;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h2 style="margin:0;font-size:1.4rem;">✏️ Edit Clinic</h2>
+        <p style="margin:.25rem 0 0;opacity:.8;font-size:.9rem;">{{ clinic.name }}</p>
+      </div>
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-secondary btn-sm">← Back</a>
     </div>
     <div style="padding:1.5rem;">
       <form method="POST" enctype="multipart/form-data">
@@ -16,37 +19,32 @@
           <div class="form-grid">
             <div class="form-group full">
               <label>Clinic Name <span class="req">*</span></label>
-              <input type="text" name="name" class="form-control" required placeholder="e.g. VIP Medical Group – Austin TX">
+              <input type="text" name="name" class="form-control" required value="{{ clinic.name }}">
             </div>
             <div class="form-group">
               <label>State</label>
-              <input type="text" name="state" class="form-control" placeholder="e.g. TX">
+              <input type="text" name="state" class="form-control" value="{{ clinic.state or '' }}">
             </div>
             <div class="form-group">
               <label>Entity</label>
-              <input type="text" name="entity" class="form-control" placeholder="e.g. VIP Medical Group TX LLC">
+              <input type="text" name="entity" class="form-control" value="{{ clinic.entity or '' }}">
             </div>
             <div class="form-group">
               <label>Site Status</label>
               <select name="site_status" class="form-control">
                 <option value="">— Select —</option>
-                <option>Scouting</option>
-                <option>Lease Negotiation</option>
-                <option>Lease Signed</option>
-                <option>Build-Out</option>
-                <option>Opening Soon</option>
-                <option>Open</option>
-                <option>On Hold</option>
+                {% for s in ['Scouting','Lease Negotiation','Lease Signed','Build-Out','Opening Soon','Open','On Hold'] %}
+                <option {% if clinic.site_status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
               </select>
             </div>
             <div class="form-group">
               <label>Doctor Status</label>
               <select name="doctor_status" class="form-control">
                 <option value="">— Select —</option>
-                <option>Searching</option>
-                <option>Identified</option>
-                <option>Credentialing</option>
-                <option>Confirmed</option>
+                {% for s in ['Searching','Identified','Credentialing','Confirmed'] %}
+                <option {% if clinic.doctor_status == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
               </select>
             </div>
           </div>
@@ -58,15 +56,15 @@
           <div class="form-grid">
             <div class="form-group">
               <label>SG Project Manager</label>
-              <input type="text" name="sg_project_manager" class="form-control" placeholder="Strategic Growth PM name">
+              <input type="text" name="sg_project_manager" class="form-control" value="{{ clinic.sg_project_manager or '' }}">
             </div>
             <div class="form-group">
               <label>SG Onsite Member</label>
-              <input type="text" name="sg_onsite_member" class="form-control" placeholder="Strategic Growth Onsite">
+              <input type="text" name="sg_onsite_member" class="form-control" value="{{ clinic.sg_onsite_member or '' }}">
             </div>
             <div class="form-group">
               <label>Operations Onsite Member</label>
-              <input type="text" name="ops_onsite_member" class="form-control" placeholder="Ops Onsite Member name">
+              <input type="text" name="ops_onsite_member" class="form-control" value="{{ clinic.ops_onsite_member or '' }}">
             </div>
           </div>
         </div>
@@ -77,15 +75,15 @@
           <div class="form-grid">
             <div class="form-group">
               <label>Set-Up Week</label>
-              <input type="text" name="setup_week" class="form-control" placeholder="e.g. 3/30–4/3">
+              <input type="text" name="setup_week" class="form-control" value="{{ clinic.setup_week or '' }}">
             </div>
             <div class="form-group">
               <label>Opening Day / Date</label>
-              <input type="date" name="opening_date" class="form-control">
+              <input type="date" name="opening_date" class="form-control" value="{{ clinic.opening_date or '' }}">
             </div>
             <div class="form-group">
               <label>Targeting Opening Month</label>
-              <input type="text" name="targeting_opening_month" class="form-control" placeholder="e.g. April 2025">
+              <input type="text" name="targeting_opening_month" class="form-control" value="{{ clinic.targeting_opening_month or '' }}">
             </div>
           </div>
         </div>
@@ -96,19 +94,19 @@
           <div class="form-grid">
             <div class="form-group">
               <label>Procedures Done Where</label>
-              <input type="text" name="procedures_done_where" class="form-control" placeholder="e.g. In-clinic, ASC, Both">
+              <input type="text" name="procedures_done_where" class="form-control" value="{{ clinic.procedures_done_where or '' }}">
             </div>
             <div class="form-group">
               <label>Paired Clinic</label>
-              <input type="text" name="paired_clinic" class="form-control" placeholder="e.g. VIP Dallas">
+              <input type="text" name="paired_clinic" class="form-control" value="{{ clinic.paired_clinic or '' }}">
             </div>
             <div class="form-group">
               <label>Total Buildout Cost</label>
-              <input type="text" name="total_buildout_cost" class="form-control" placeholder="e.g. $150,000">
+              <input type="text" name="total_buildout_cost" class="form-control" value="{{ clinic.total_buildout_cost or '' }}">
             </div>
             <div class="form-group">
               <label>Cost to VIP</label>
-              <input type="text" name="cost_to_vip" class="form-control" placeholder="e.g. $40,000 after TI">
+              <input type="text" name="cost_to_vip" class="form-control" value="{{ clinic.cost_to_vip or '' }}">
             </div>
           </div>
         </div>
@@ -119,15 +117,15 @@
           <div class="form-grid">
             <div class="form-group full">
               <label>Data Analysis Summary</label>
-              <textarea name="data_analysis_summary" class="form-control" rows="3" placeholder="Key demographic/market research notes..."></textarea>
+              <textarea name="data_analysis_summary" class="form-control" rows="3">{{ clinic.data_analysis_summary or '' }}</textarea>
             </div>
             <div class="form-group full">
               <label>Clinic Notes</label>
-              <textarea name="clinic_notes" class="form-control" rows="3" placeholder="General notes about this clinic..."></textarea>
+              <textarea name="clinic_notes" class="form-control" rows="3">{{ clinic.clinic_notes or '' }}</textarea>
             </div>
             <div class="form-group full">
               <label>📷 Photos / Videos Folder Link</label>
-              <input type="url" name="photos_videos_link" class="form-control" placeholder="https://drive.google.com/...">
+              <input type="url" name="photos_videos_link" class="form-control" value="{{ clinic.photos_videos_link or '' }}">
             </div>
           </div>
         </div>
@@ -138,20 +136,30 @@
           <div class="form-grid">
             <div class="form-group">
               <label>📄 Lease Document</label>
+              {% if clinic.lease_filename %}
+              <p style="font-size:.85rem;margin:0 0 .4rem;">
+                Current: <a href="{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.lease_filename) }}" target="_blank">{{ clinic.lease_filename }}</a>
+              </p>
+              {% endif %}
               <input type="file" name="lease_file" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls">
-              <small class="text-muted">PDF, DOCX, or XLSX</small>
+              <small class="text-muted">Upload new to replace existing</small>
             </div>
             <div class="form-group">
               <label>📋 Supply Check-In List</label>
+              {% if clinic.supply_checkin_filename %}
+              <p style="font-size:.85rem;margin:0 0 .4rem;">
+                Current: <a href="{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.supply_checkin_filename) }}" target="_blank">{{ clinic.supply_checkin_filename }}</a>
+              </p>
+              {% endif %}
               <input type="file" name="supply_checkin_file" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls">
-              <small class="text-muted">PDF, DOCX, or XLSX</small>
+              <small class="text-muted">Upload new to replace existing</small>
             </div>
           </div>
         </div>
 
         <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1.5rem;">
-          <button type="submit" class="btn btn-primary">🚀 Create Clinic &amp; Copy Tasks</button>
-          <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+          <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-secondary">Cancel</a>
         </div>
       </form>
     </div>

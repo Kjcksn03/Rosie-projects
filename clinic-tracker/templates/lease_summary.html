@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Lease Summary – {{ clinic.name }} | VIP Medical Group{% endblock %}
+{% block content %}
+<div class="container" style="max-width:900px;margin:2rem auto;padding:0 1rem;">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
+    <div>
+      <h2 style="margin:0;color:var(--navy);">📋 Lease Summary</h2>
+      <p style="margin:.2rem 0 0;color:#555;">{{ clinic.name }}{% if clinic.state %} · {{ clinic.state }}{% endif %}</p>
+    </div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+      {% if clinic.lease_filename %}
+      <a href="{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.lease_filename) }}" target="_blank" class="btn btn-secondary btn-sm">📄 View Lease Document</a>
+      {% endif %}
+      <button onclick="window.print()" class="btn btn-secondary btn-sm">🖨️ Print</button>
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-secondary btn-sm">← Back to Clinic</a>
+    </div>
+  </div>
+
+  <!-- Edit / View form -->
+  <div class="card">
+    <div class="card-header" style="background:var(--navy);color:#fff;padding:1rem 1.5rem;border-radius:8px 8px 0 0;">
+      <h3 style="margin:0;font-size:1.1rem;">Lease Details</h3>
+    </div>
+    <div style="padding:1.5rem;">
+      <form method="POST">
+        <div class="lease-grid">
+
+          <div class="lease-group">
+            <label>Landlord Name</label>
+            <input type="text" name="landlord_name" class="form-control" value="{{ lease.landlord_name if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Landlord Contact</label>
+            <input type="text" name="landlord_contact" class="form-control" placeholder="Phone / Email" value="{{ lease.landlord_contact if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Landlord Broker</label>
+            <input type="text" name="landlord_broker" class="form-control" value="{{ lease.landlord_broker if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Attorney Name</label>
+            <input type="text" name="attorney_name" class="form-control" value="{{ lease.attorney_name if lease else '' }}">
+          </div>
+
+          <div class="lease-group">
+            <label>Building Address</label>
+            <input type="text" name="building_address" class="form-control" value="{{ lease.building_address if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Suite / Unit Number</label>
+            <input type="text" name="suite_unit" class="form-control" value="{{ lease.suite_unit if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Square Footage</label>
+            <input type="text" name="square_footage" class="form-control" placeholder="e.g. 2,400 sq ft" value="{{ lease.square_footage if lease else '' }}">
+          </div>
+
+          <div class="lease-group">
+            <label>Lease Start Date</label>
+            <input type="date" name="lease_start_date" class="form-control" value="{{ lease.lease_start_date if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Lease End Date</label>
+            <input type="date" name="lease_end_date" class="form-control" value="{{ lease.lease_end_date if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Rent Commencement Date</label>
+            <input type="date" name="rent_commencement_date" class="form-control" value="{{ lease.rent_commencement_date if lease else '' }}">
+          </div>
+
+          <div class="lease-group">
+            <label>Monthly Rent</label>
+            <input type="text" name="monthly_rent" class="form-control" placeholder="e.g. $8,500/mo" value="{{ lease.monthly_rent if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Security Deposit</label>
+            <input type="text" name="security_deposit" class="form-control" placeholder="e.g. $17,000" value="{{ lease.security_deposit if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>TI Allowance</label>
+            <input type="text" name="ti_allowance" class="form-control" placeholder="e.g. $50/sq ft" value="{{ lease.ti_allowance if lease else '' }}">
+          </div>
+
+          <div class="lease-group">
+            <label>DocuSign Sent To</label>
+            <input type="text" name="docusign_sent_to" class="form-control" value="{{ lease.docusign_sent_to if lease else 'Matt Stearns - CFO' }}">
+          </div>
+
+          <div class="lease-group full">
+            <label>Key Lease Terms / Notes</label>
+            <textarea name="key_lease_terms" class="form-control" rows="5" placeholder="Free rent period, renewal options, CAM charges, exclusivity clause...">{{ lease.key_lease_terms if lease else '' }}</textarea>
+          </div>
+
+        </div>
+
+        <div style="margin-top:1.25rem;display:flex;gap:1rem;flex-wrap:wrap;">
+          <button type="submit" class="btn btn-primary">💾 Save Lease Summary</button>
+          {% if lease %}
+          <span style="color:#888;font-size:.85rem;align-self:center;">Last updated: {{ lease.updated_at[:16] if lease.updated_at else '' }}</span>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if lease %}
+  <!-- Printable summary card -->
+  <div class="card print-card" style="margin-top:1.5rem;">
+    <div class="card-header" style="background:var(--gold,#c8a951);color:var(--navy);padding:1rem 1.5rem;border-radius:8px 8px 0 0;">
+      <h3 style="margin:0;">📄 Printable Lease Overview — {{ clinic.name }}</h3>
+    </div>
+    <div style="padding:1.5rem;">
+      <div class="print-grid">
+        {% set items = [
+          ('Landlord', lease.landlord_name),
+          ('Landlord Contact', lease.landlord_contact),
+          ('Landlord Broker', lease.landlord_broker),
+          ('Attorney', lease.attorney_name),
+          ('Address', lease.building_address),
+          ('Suite / Unit', lease.suite_unit),
+          ('Square Footage', lease.square_footage),
+          ('Lease Start', lease.lease_start_date),
+          ('Lease End', lease.lease_end_date),
+          ('Rent Commencement', lease.rent_commencement_date),
+          ('Monthly Rent', lease.monthly_rent),
+          ('Security Deposit', lease.security_deposit),
+          ('TI Allowance', lease.ti_allowance),
+          ('DocuSign Sent To', lease.docusign_sent_to),
+        ] %}
+        {% for label, val in items %}
+        {% if val %}
+        <div class="print-item">
+          <span class="print-label">{{ label }}</span>
+          <span class="print-val">{{ val }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% if lease.key_lease_terms %}
+      <div style="margin-top:1rem;">
+        <strong style="color:var(--navy);">Key Lease Terms / Notes:</strong>
+        <p style="margin:.5rem 0 0;white-space:pre-wrap;background:#f8f9fa;padding:.75rem;border-radius:6px;font-size:.9rem;">{{ lease.key_lease_terms }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+.lease-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.lease-group { display:flex; flex-direction:column; gap:.35rem; }
+.lease-group.full { grid-column:1/-1; }
+.lease-group label { font-weight:600; font-size:.85rem; color:var(--navy); }
+.print-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+.print-item { display:flex; flex-direction:column; }
+.print-label { font-size:.75rem; font-weight:700; text-transform:uppercase; color:#888; }
+.print-val { font-size:.95rem; color:#222; }
+@media(max-width:600px){ .lease-grid,.print-grid{ grid-template-columns:1fr; } .lease-group.full{ grid-column:1; } }
+@media print {
+  .navbar, .flash-container, form button, .btn { display:none !important; }
+  .card { box-shadow:none; border:1px solid #ddd; }
+  .print-card { page-break-inside:avoid; }
+}
+</style>
+{% endblock %}

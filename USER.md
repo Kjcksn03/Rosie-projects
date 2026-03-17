@@ -3,6 +3,7 @@
 - **Name:** Kelly
 - **What to call them:** Kelly
 - **Pronouns:** _(unknown for now)_
+- **Email:** kelly.jackson@vipmedicalgroup.com
 - **Timezone:** _(unknown for now)_
 - **Notes:** First contact. Said hello via WhatsApp.
 

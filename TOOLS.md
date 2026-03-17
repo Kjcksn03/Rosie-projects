@@ -1,40 +1,25 @@
 # TOOLS.md - Local Notes
 
-Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
+## Email Rules
+- Always address Caroline Novak as **Dr. Novak**
+- Always CC **kelly.jackson@vipmedicalgroup.com** on every email sent
 
-## What Goes Here
+## Gmail
 
-Things like:
+- **Account:** kellyjacksonassistant@gmail.com
+- **App Password:** uxvj huuj udrf cnmg
 
-- Camera names and locations
-- SSH hosts and aliases
-- Preferred voices for TTS
-- Speaker/room names
-- Device nicknames
-- Anything environment-specific
+## Render
 
-## Examples
+- **API Key:** rnd_FssUiLBqly8zkCOq9opy7CQOvOMP
+- **Workspace:** Kelly and Rosie's work space (kellyjackson101803@gmail.com)
 
-```markdown
-### Cameras
+## GitHub
 
-- living-room → Main area, 180° wide angle
-- front-door → Entrance, motion-triggered
-
-### SSH
-
-- home-server → 192.168.1.100, user: admin
-
-### TTS
-
-- Preferred voice: "Nova" (warm, slightly British)
-- Default speaker: Kitchen HomePod
-```
-
-## Why Separate?
-
-Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
+- **Repo:** https://github.com/Kjcksn03/Rosie-projects
+- **Username:** Kjcksn03
+- **Token:** stored in git remote URL (configured)
 
 ---
 
-Add whatever helps you do your job. This is your cheat sheet.
+Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
