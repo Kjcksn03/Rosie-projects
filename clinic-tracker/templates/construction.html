@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Construction – {{ clinic.name }} | VIP Medical Group{% endblock %}
+{% block head %}
+<style>
+.gantt-wrap { overflow-x:auto; margin-top:1.5rem; }
+.gantt-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+.gantt-table th { background:var(--navy); color:#fff; padding:.6rem .8rem; text-align:left; font-weight:600; white-space:nowrap; }
+.gantt-table td { padding:.55rem .8rem; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.gantt-table tr:hover td { background:#f8f9fa; }
+.gantt-bar-cell { min-width:280px; }
+.gantt-bar-outer { background:#e5e7eb; border-radius:4px; height:18px; position:relative; }
+.gantt-bar-inner { height:18px; border-radius:4px; position:absolute; top:0; }
+.bar-Not-Started { background:#d1d5db; }
+.bar-In-Progress { background:var(--gold); }
+.bar-Complete { background:#16a34a; }
+.bar-Delayed { background:#ef4444; }
+.status-badge { display:inline-block; padding:.2rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600; white-space:nowrap; }
+.s-Not-Started { background:#f3f4f6; color:#374151; }
+.s-In-Progress { background:#fef9c3; color:#854d0e; }
+.s-Complete { background:#dcfce7; color:#166534; }
+.s-Delayed { background:#fee2e2; color:#991b1b; }
+.inline-edit { border:1px solid transparent; background:transparent; padding:.2rem .4rem; border-radius:4px; width:100%; font-size:.88rem; }
+.inline-edit:focus { border-color:var(--navy); background:#fff; outline:none; }
+.progress-summary { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+.progress-pill { background:#fff; border-radius:8px; padding:.7rem 1.2rem; box-shadow:0 1px 4px rgba(0,0,0,.08); font-size:.9rem; }
+.progress-pill strong { color:var(--navy); font-size:1.3rem; }
+@media(max-width:700px){
+  .gantt-table .hide-mobile { display:none; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1200px;margin:2rem auto;padding:0 1rem;">
+
+  <div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Construction</span>
+  </div>
+
+  <div class="page-header" style="margin-bottom:1.2rem;">
+    <div>
+      <div class="page-title">🏗️ Construction Tracker</div>
+      <div class="page-subtitle">{{ clinic.name }}{% if clinic.opening_date %} · Target Opening: {{ clinic.opening_date }}{% endif %}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-outline btn-sm">← Back to Clinic</a>
+    </div>
+  </div>
+
+  <!-- Progress Summary -->
+  {% set total = tasks|length %}
+  {% set done = tasks|selectattr('status', 'equalto', 'Complete')|list|length %}
+  {% set in_prog = tasks|selectattr('status', 'equalto', 'In Progress')|list|length %}
+  {% set delayed = tasks|selectattr('status', 'equalto', 'Delayed')|list|length %}
+  <div class="progress-summary">
+    <div class="progress-pill"><strong>{{ total }}</strong><br><span style="color:#666;font-size:.8rem;">Total Tasks</span></div>
+    <div class="progress-pill"><strong style="color:#16a34a;">{{ done }}</strong><br><span style="color:#666;font-size:.8rem;">Complete</span></div>
+    <div class="progress-pill"><strong style="color:#854d0e;">{{ in_prog }}</strong><br><span style="color:#666;font-size:.8rem;">In Progress</span></div>
+    <div class="progress-pill"><strong style="color:#ef4444;">{{ delayed }}</strong><br><span style="color:#666;font-size:.8rem;">Delayed</span></div>
+    <div class="progress-pill"><strong>{{ ((done / total * 100)|round|int) if total > 0 else 0 }}%</strong><br><span style="color:#666;font-size:.8rem;">Complete</span></div>
+  </div>
+
+  <!-- Add Task -->
+  <div style="background:#fff;border-radius:10px;padding:1rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:1.5rem;">
+    <form method="POST" action="{{ url_for('add_construction_task', clinic_id=clinic.id) }}" class="d-flex gap-2 flex-wrap align-items-center">
+      <input type="text" name="name" placeholder="New task name..." class="form-control" style="min-width:220px;" required>
+      <button type="submit" class="btn btn-gold btn-sm">➕ Add Task</button>
+    </form>
+  </div>
+
+  <!-- Gantt Table -->
+  <div class="gantt-wrap">
+    <table class="gantt-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Task</th>
+          <th class="hide-mobile">Start Date</th>
+          <th class="hide-mobile">Due Date</th>
+          <th>Status</th>
+          <th class="hide-mobile">Notes</th>
+          <th>Timeline</th>
+          {% if session.role == 'admin' %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in tasks %}
+        <tr data-task-id="{{ task.id }}">
+          <td style="color:#888;font-size:.82rem;">{{ loop.index }}</td>
+          <td><strong>{{ task.name }}</strong></td>
+          <td class="hide-mobile">
+            <input type="date" class="inline-edit" data-field="start_date" value="{{ task.start_date or '' }}">
+          </td>
+          <td class="hide-mobile">
+            <input type="date" class="inline-edit" data-field="due_date" value="{{ task.due_date or '' }}">
+          </td>
+          <td>
+            <select class="inline-edit status-select" data-field="status" style="width:130px;">
+              {% for s in construction_statuses %}
+              <option value="{{ s }}" {% if task.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="hide-mobile">
+            <input type="text" class="inline-edit" data-field="notes" value="{{ task.notes or '' }}" placeholder="Notes...">
+          </td>
+          <td class="gantt-bar-cell">
+            {% if task.start_date and task.due_date %}
+              {% set start = task.start_date %}
+              {% set end = task.due_date %}
+              <div class="gantt-bar-outer">
+                <div class="gantt-bar-inner bar-{{ task.status.replace(' ', '-') }}"
+                  style="left:0;width:100%;"
+                  title="{{ start }} → {{ end }}"></div>
+              </div>
+              <div style="font-size:.75rem;color:#888;margin-top:.15rem;">{{ start }} → {{ end }}</div>
+            {% else %}
+              <span style="color:#aaa;font-size:.8rem;">No dates set</span>
+            {% endif %}
+          </td>
+          {% if session.role == 'admin' %}
+          <td>
+            <form method="POST" action="{{ url_for('delete_construction_task', clinic_id=clinic.id, task_id=task.id) }}"
+              onsubmit="return confirm('Delete this task?');">
+              <button class="btn btn-danger btn-sm" style="padding:.2rem .5rem;font-size:.75rem;">🗑️</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Visual Gantt Chart -->
+  {% if tasks %}
+  <div style="margin-top:2rem;background:#fff;border-radius:10px;padding:1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+    <h3 style="color:var(--navy);margin:0 0 1rem;">📊 Visual Gantt Chart</h3>
+    <div id="gantt-visual" style="overflow-x:auto;">
+      <canvas id="ganttCanvas" style="min-width:700px;"></canvas>
+    </div>
+    <div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:.8rem;font-size:.82rem;">
+      <span><span style="display:inline-block;width:14px;height:14px;background:#d1d5db;border-radius:3px;vertical-align:middle;"></span> Not Started</span>
+      <span><span style="display:inline-block;width:14px;height:14px;background:#f59e0b;border-radius:3px;vertical-align:middle;"></span> In Progress</span>
+      <span><span style="display:inline-block;width:14px;height:14px;background:#16a34a;border-radius:3px;vertical-align:middle;"></span> Complete</span>
+      <span><span style="display:inline-block;width:14px;height:14px;background:#ef4444;border-radius:3px;vertical-align:middle;"></span> Delayed</span>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+// Inline edit: auto-save
+document.querySelectorAll('[data-task-id]').forEach(function(row) {
+  var taskId = row.dataset.taskId;
+  row.querySelectorAll('.inline-edit').forEach(function(el) {
+    var field = el.dataset.field;
+    var timeout;
+    function save() {
+      fetch('{{ url_for("update_construction_task", clinic_id=clinic.id) }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'task_id=' + taskId + '&field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(el.value)
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(d.ok) {
+          el.style.borderColor = '#16a34a';
+          setTimeout(function(){ el.style.borderColor=''; }, 1200);
+        }
+      });
+    }
+    if (el.tagName === 'SELECT') {
+      el.addEventListener('change', save);
+    } else {
+      el.addEventListener('blur', save);
+      el.addEventListener('input', function(){ clearTimeout(timeout); timeout=setTimeout(save,800); });
+    }
+  });
+});
+
+// Draw Gantt chart
+(function(){
+  var tasksData = {{ tasks | tojson }};
+  // Filter tasks with dates
+  var dated = tasksData.filter(function(t){ return t.start_date && t.due_date; });
+  if (!dated.length) return;
+
+  var minDate = dated.reduce(function(m,t){ return t.start_date < m ? t.start_date : m; }, dated[0].start_date);
+  var maxDate = dated.reduce(function(m,t){ return t.due_date > m ? t.due_date : m; }, dated[0].due_date);
+  var minMs = new Date(minDate).getTime();
+  var maxMs = new Date(maxDate).getTime();
+  var totalMs = maxMs - minMs || 1;
+
+  var rowH = 30, labelW = 220, chartW = 600, padding = 10;
+  var canvas = document.getElementById('ganttCanvas');
+  if (!canvas) return;
+  canvas.width = labelW + chartW + padding * 2;
+  canvas.height = dated.length * rowH + 40;
+  var ctx = canvas.getContext('2d');
+
+  // Header
+  ctx.fillStyle = '#1e3a5f';
+  ctx.fillRect(0, 0, canvas.width, rowH);
+  ctx.fillStyle = '#fff';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('Task', 8, 20);
+
+  // Draw date markers
+  var months = [];
+  var d = new Date(minDate);
+  d.setDate(1);
+  while (d.getTime() <= maxMs) {
+    months.push(new Date(d));
+    d.setMonth(d.getMonth() + 1);
+  }
+  months.forEach(function(m){
+    var x = labelW + ((m.getTime() - minMs) / totalMs) * chartW;
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px sans-serif';
+    ctx.fillText(m.toLocaleString('default',{month:'short',year:'2-digit'}), x, 20);
+    ctx.strokeStyle = '#ddd';
+    ctx.beginPath(); ctx.moveTo(x, rowH); ctx.lineTo(x, canvas.height); ctx.stroke();
+  });
+
+  var colors = {'Not Started':'#d1d5db','In Progress':'#f59e0b','Complete':'#16a34a','Delayed':'#ef4444'};
+
+  dated.forEach(function(t, i) {
+    var y = (i + 1) * rowH;
+    // Label
+    ctx.fillStyle = i % 2 === 0 ? '#f9fafb' : '#fff';
+    ctx.fillRect(0, y, canvas.width, rowH);
+    ctx.fillStyle = '#1e3a5f';
+    ctx.font = '11px sans-serif';
+    var label = t.name.length > 28 ? t.name.slice(0, 28) + '…' : t.name;
+    ctx.fillText(label, 6, y + 20);
+
+    // Bar
+    var startX = labelW + ((new Date(t.start_date).getTime() - minMs) / totalMs) * chartW;
+    var endX = labelW + ((new Date(t.due_date).getTime() - minMs) / totalMs) * chartW;
+    var barW = Math.max(endX - startX, 6);
+    ctx.fillStyle = colors[t.status] || '#d1d5db';
+    ctx.beginPath();
+    ctx.roundRect(startX, y + 6, barW, rowH - 12, 3);
+    ctx.fill();
+  });
+
+  // Today line
+  var todayMs = new Date().getTime();
+  if (todayMs >= minMs && todayMs <= maxMs) {
+    var tx = labelW + ((todayMs - minMs) / totalMs) * chartW;
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx, rowH); ctx.lineTo(tx, canvas.height); ctx.stroke();
+    ctx.fillStyle = '#ef4444';
+    ctx.font = '10px sans-serif';
+    ctx.fillText('Today', tx + 3, rowH + 12);
+  }
+})();
+</script>
+{% endblock %}

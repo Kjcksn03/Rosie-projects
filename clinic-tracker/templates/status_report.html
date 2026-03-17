@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Status Report – {{ clinic.name }} | VIP Medical Group{% endblock %}
+{% block head %}
+<style>
+@media print {
+  .navbar, .breadcrumb, .page-header .btn, .no-print { display:none !important; }
+  body { font-size:11pt; }
+  .container { max-width:100%; padding:0; }
+  .status-section { page-break-inside:avoid; }
+}
+.status-section { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:1.2rem; overflow:hidden; }
+.status-section-header { background:var(--navy); color:#fff; padding:.65rem 1.2rem; font-weight:700; font-size:.95rem; }
+.status-table { width:100%; border-collapse:collapse; font-size:.87rem; }
+.status-table th { background:#f8f9fa; color:var(--navy); padding:.5rem .8rem; text-align:left; font-weight:600; border-bottom:2px solid #e5e7eb; }
+.status-table td { padding:.5rem .8rem; border-bottom:1px solid #f3f4f6; }
+.overdue-row td { background:#fee2e2 !important; }
+.due-soon-row td { background:#fef9c3 !important; }
+.badge-overdue { display:inline-block; background:#ef4444; color:#fff; padding:.1rem .45rem; border-radius:8px; font-size:.75rem; font-weight:700; }
+.badge-due-soon { display:inline-block; background:#f59e0b; color:#fff; padding:.1rem .45rem; border-radius:8px; font-size:.75rem; font-weight:700; }
+.status-pill { display:inline-block; padding:.15rem .5rem; border-radius:8px; font-size:.78rem; font-weight:600; }
+.s-Not-Started { background:#f3f4f6; color:#374151; }
+.s-In-Progress { background:#fef9c3; color:#854d0e; }
+.s-Blocked { background:#fee2e2; color:#991b1b; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1000px;margin:2rem auto;padding:0 1rem;">
+
+  <div class="breadcrumb no-print">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Status Report</span>
+  </div>
+
+  <div class="page-header" style="margin-bottom:1.5rem;">
+    <div>
+      <div class="page-title">📊 Weekly Status Report</div>
+      <div class="page-subtitle">{{ clinic.name }} &nbsp;·&nbsp; Generated {{ today }}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap no-print">
+      <button onclick="window.print()" class="btn btn-gold btn-sm">🖨️ Print / Export</button>
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-outline btn-sm">← Back</a>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div style="background:#fff;border-radius:10px;padding:1rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:1.5rem;">
+    <strong style="color:var(--navy);">Report Summary:</strong>
+    All incomplete tasks grouped by department.
+    <span class="badge-overdue" style="margin-left:.5rem;">Red</span> = Overdue &nbsp;
+    <span class="badge-due-soon">Yellow</span> = Due this week (by {{ week_end }})
+  </div>
+
+  {% if dept_tasks %}
+    {% for dept, tasks in dept_tasks.items() %}
+    <div class="status-section">
+      <div class="status-section-header">{{ dept }}</div>
+      <table class="status-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Phase</th>
+            <th>Due Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in tasks %}
+          {% set is_overdue = task.due_date and task.due_date < today %}
+          {% set is_due_soon = task.due_date and task.due_date >= today and task.due_date <= week_end %}
+          <tr class="{% if is_overdue %}overdue-row{% elif is_due_soon %}due-soon-row{% endif %}">
+            <td>
+              <a href="{{ url_for('task_detail', task_id=task.id) }}" style="color:var(--navy);font-weight:500;">{{ task.name }}</a>
+              {% if is_overdue %}<span class="badge-overdue" style="margin-left:.4rem;">OVERDUE</span>{% endif %}
+              {% if is_due_soon %}<span class="badge-due-soon" style="margin-left:.4rem;">DUE SOON</span>{% endif %}
+            </td>
+            <td style="font-size:.82rem;color:#555;">{{ task.time_phase or '–' }}</td>
+            <td style="white-space:nowrap;">{{ task.due_date or '–' }}</td>
+            <td><span class="status-pill s-{{ task.status.replace(' ', '-') }}">{{ task.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div style="background:#fff;border-radius:10px;padding:2rem;text-align:center;color:#666;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+      🎉 All tasks are complete!
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

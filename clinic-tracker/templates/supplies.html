@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}Supply Check-In – {{ clinic.name }} | VIP Medical Group{% endblock %}
+{% block head %}
+<style>
+.supply-tabs { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+.supply-tab-btn { padding:.5rem 1.1rem; border:2px solid var(--navy); border-radius:6px; background:#fff; color:var(--navy); cursor:pointer; font-weight:600; font-size:.9rem; text-decoration:none; transition:all .2s; }
+.supply-tab-btn.active, .supply-tab-btn:hover { background:var(--navy); color:#fff; }
+.supply-progress { height:8px; background:#e5e7eb; border-radius:4px; margin:.4rem 0; }
+.supply-progress-bar { height:8px; border-radius:4px; background:var(--gold); transition:width .3s; }
+.supply-progress-bar.full { background:#16a34a; }
+.supply-section { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:1.5rem; overflow:hidden; }
+.supply-section-header { background:var(--navy); color:#fff; padding:.7rem 1.2rem; font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
+.supply-section-header .priority-badge { background:var(--gold); color:var(--navy); padding:.15rem .5rem; border-radius:10px; font-size:.78rem; font-weight:700; }
+.supply-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+.supply-table th { background:#f8f9fa; color:var(--navy); padding:.6rem .8rem; text-align:left; font-weight:600; border-bottom:2px solid #e5e7eb; }
+.supply-table td { padding:.55rem .8rem; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.supply-table tr:hover td { background:#fafafa; }
+.status-badge { display:inline-block; padding:.2rem .6rem; border-radius:10px; font-size:.78rem; font-weight:600; }
+.status-Not-Ordered { background:#fee2e2; color:#991b1b; }
+.status-Ordered { background:#fef9c3; color:#854d0e; }
+.status-Delivered { background:#dcfce7; color:#166534; }
+.status-Issue { background:#fce7f3; color:#9d174d; }
+.inline-edit { border:1px solid transparent; background:transparent; padding:.2rem .4rem; border-radius:4px; width:100%; min-width:80px; font-size:.88rem; }
+.inline-edit:focus { border-color:var(--navy); background:#fff; outline:none; }
+.summary-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:1rem; margin-bottom:1.5rem; }
+.summary-card { background:#fff; border-radius:10px; padding:1rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.summary-card .number { font-size:2rem; font-weight:700; color:var(--navy); }
+.summary-card .label { font-size:.8rem; color:#666; margin-top:.2rem; }
+.rooms-bar { background:#fff; border-radius:10px; padding:1rem 1.5rem; box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:1.5rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+.rooms-bar label { font-weight:600; color:var(--navy); }
+.rooms-bar input { width:80px; padding:.35rem .5rem; border:2px solid var(--navy); border-radius:6px; font-size:1rem; text-align:center; }
+.add-item-row { background:#f8f9fa; }
+.add-item-row td { padding:.7rem .8rem; }
+@media(max-width:700px){
+  .supply-table { font-size:.8rem; }
+  .supply-table th, .supply-table td { padding:.4rem .5rem; }
+  .supply-table .hide-mobile { display:none; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1200px;margin:2rem auto;padding:0 1rem;">
+
+  <div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Supply Check-In</span>
+  </div>
+
+  <div class="page-header" style="margin-bottom:1.2rem;">
+    <div>
+      <div class="page-title">📦 Supply Check-In</div>
+      <div class="page-subtitle">{{ clinic.name }}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-outline btn-sm">← Back to Clinic</a>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="number">{{ total_all }}</div>
+      <div class="label">Total Items</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:#854d0e;">{{ ordered_all }}</div>
+      <div class="label">Ordered</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:#166534;">{{ delivered_all }}</div>
+      <div class="label">Delivered</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:#9d174d;">{{ issues_all }}</div>
+      <div class="label">Issues</div>
+    </div>
+    <div class="summary-card">
+      <div class="number" style="color:var(--navy);">{{ ((delivered_all / total_all * 100) | round | int) if total_all > 0 else 0 }}%</div>
+      <div class="label">Delivered</div>
+    </div>
+  </div>
+
+  <!-- # of Rooms -->
+  <div class="rooms-bar">
+    <label>📐 # of Exam Rooms:</label>
+    <input type="number" id="num-rooms" value="3" min="1" max="20">
+    <span style="color:#666;font-size:.85rem;">Used to calculate quantities marked "# of rooms"</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="supply-tabs">
+    {% for tab in tabs %}
+    <a href="{{ url_for('clinic_supplies', clinic_id=clinic.id, tab=tab) }}"
+       class="supply-tab-btn {% if active_tab == tab %}active{% endif %}">
+      {{ tab }}
+      {% if tab_data[tab] %}
+        <span style="font-size:.75rem;opacity:.8;">({{ tab_data[tab].delivered }}/{{ tab_data[tab].total }})</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if tab_data[active_tab] %}
+    {% set td = tab_data[active_tab] %}
+    <!-- Tab Progress -->
+    <div style="background:#fff;border-radius:10px;padding:1rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:1.5rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
+        <strong>{{ active_tab }} Progress</strong>
+        <span>{{ td.delivered }}/{{ td.total }} Delivered ({{ td.pct }}%)</span>
+      </div>
+      <div class="supply-progress">
+        <div class="supply-progress-bar {% if td.pct == 100 %}full{% endif %}" style="width:{{ td.pct }}%"></div>
+      </div>
+      <div style="font-size:.82rem;color:#666;margin-top:.4rem;">
+        {{ td.ordered }} ordered &nbsp;·&nbsp; {{ td.delivered }} delivered &nbsp;·&nbsp; {{ td.issues }} issues
+      </div>
+    </div>
+
+    <!-- Items by Category -->
+    {% for cat, items in td.categories.items() %}
+    <div class="supply-section">
+      <div class="supply-section-header">
+        <span>{{ cat }}</span>
+        {% if cat == 'HIGH PRIORITY' %}<span class="priority-badge">⚡ HIGH PRIORITY</span>{% endif %}
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="supply-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th class="hide-mobile">Default Qty</th>
+              <th class="hide-mobile">Team</th>
+              <th>Status</th>
+              <th class="hide-mobile">Expected Delivery</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr data-item-id="{{ item.id }}">
+              <td>
+                <strong>{{ item.item_name }}</strong>
+                {% if item.amount_ordered %}
+                <div style="font-size:.78rem;color:#666;">Ordered: {{ item.amount_ordered }}</div>
+                {% endif %}
+              </td>
+              <td class="hide-mobile">
+                <span class="qty-display" data-rooms="{{ item.default_qty }}">
+                  {% if item.default_qty == '# of rooms' or item.default_qty == '# of staff' %}
+                    <em style="color:#888;">{{ item.default_qty }}</em>
+                  {% else %}
+                    {{ item.default_qty or '–' }}
+                  {% endif %}
+                </span>
+              </td>
+              <td class="hide-mobile" style="font-size:.82rem;color:#555;">{{ item.team_ordering or '–' }}</td>
+              <td>
+                <select class="inline-edit status-select" data-field="order_status" style="width:130px;">
+                  {% for s in supply_statuses %}
+                  <option value="{{ s }}" {% if item.order_status == s %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="hide-mobile">
+                <input type="date" class="inline-edit" data-field="expected_delivery_date"
+                  value="{{ item.expected_delivery_date or '' }}">
+              </td>
+              <td>
+                <input type="text" class="inline-edit" data-field="notes"
+                  value="{{ item.notes or '' }}" placeholder="Notes...">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+
+    <!-- Add item form for this tab -->
+    <div class="supply-section" style="margin-top:1rem;">
+      <div class="supply-section-header"><span>➕ Add Item to {{ active_tab }}</span></div>
+      <div style="padding:1rem 1.5rem;">
+        <form method="POST" action="{{ url_for('add_supply_item', clinic_id=clinic.id) }}" class="d-flex gap-2 flex-wrap">
+          <input type="hidden" name="tab" value="{{ active_tab }}">
+          <input type="text" name="item_name" placeholder="Item name" class="form-control" style="min-width:200px;" required>
+          <input type="text" name="default_qty" placeholder="Qty" class="form-control" style="width:100px;">
+          <input type="text" name="team_ordering" placeholder="Team" class="form-control" style="width:130px;">
+          <input type="text" name="category" placeholder="Category" class="form-control" style="width:150px;" value="{{ active_tab }} Items">
+          <button type="submit" class="btn btn-gold btn-sm">Add Item</button>
+        </form>
+      </div>
+    </div>
+
+  {% else %}
+    <div style="background:#fff;border-radius:10px;padding:2rem;text-align:center;color:#666;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+      No items in this tab yet.
+      <form method="POST" action="{{ url_for('add_supply_item', clinic_id=clinic.id) }}" style="margin-top:1rem;" class="d-flex gap-2 flex-wrap justify-content-center">
+        <input type="hidden" name="tab" value="{{ active_tab }}">
+        <input type="text" name="item_name" placeholder="Item name" class="form-control" style="min-width:200px;" required>
+        <input type="text" name="category" placeholder="Category" class="form-control" style="width:150px;" value="{{ active_tab }} Items">
+        <button type="submit" class="btn btn-gold btn-sm">Add First Item</button>
+      </form>
+    </div>
+  {% endif %}
+
+</div>
+
+<script>
+// Inline edit: auto-save on change/blur
+document.querySelectorAll('[data-item-id]').forEach(function(row) {
+  var itemId = row.dataset.itemId;
+  row.querySelectorAll('.inline-edit').forEach(function(el) {
+    var field = el.dataset.field;
+    var timeout;
+    function save() {
+      fetch('{{ url_for("update_supply_item", clinic_id=clinic.id) }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'item_id=' + itemId + '&field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(el.value)
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if(d.ok) {
+          el.style.borderColor = '#16a34a';
+          setTimeout(function(){ el.style.borderColor = ''; }, 1200);
+          // Update status badge color if status select
+          if (field === 'order_status') {
+            var statusClass = 'status-' + el.value.replace(/ /g,'-');
+            // Just refresh page to update progress bars
+            // (lightweight: no full reload, just page refresh after a moment)
+          }
+        }
+      });
+    }
+    if (el.tagName === 'SELECT') {
+      el.addEventListener('change', save);
+    } else {
+      el.addEventListener('blur', save);
+      el.addEventListener('input', function() {
+        clearTimeout(timeout);
+        timeout = setTimeout(save, 800);
+      });
+    }
+  });
+});
+
+// # of rooms calculator
+var roomsInput = document.getElementById('num-rooms');
+function updateRooms() {
+  var n = parseInt(roomsInput.value) || 1;
+  document.querySelectorAll('.qty-display').forEach(function(el) {
+    var val = el.dataset.rooms;
+    if (val === '# of rooms') {
+      el.innerHTML = '<strong style="color:var(--navy)">' + n + '</strong> <em style="color:#888;font-size:.78rem;">(# rooms)</em>';
+    } else if (val === '# of staff') {
+      el.innerHTML = '<em style="color:#888;"># of staff</em>';
+    }
+  });
+}
+if (roomsInput) {
+  roomsInput.addEventListener('input', updateRooms);
+  updateRooms();
+}
+</script>
+{% endblock %}

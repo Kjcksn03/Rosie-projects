@@ -34,6 +34,149 @@ TIME_PHASES = [
 ]
 STATUSES = ['Not Started', 'In Progress', 'Complete', 'Blocked']
 
+SUPPLY_ORDER_STATUSES = ['Not Ordered', 'Ordered', 'Delivered', 'Issue']
+
+CONSTRUCTION_STATUSES = ['Not Started', 'In Progress', 'Complete', 'Delayed']
+
+# Master supply items list: (tab, category, item_name, default_qty, team_ordering)
+SUPPLY_MASTER = [
+    # OFFICE - HIGH PRIORITY
+    ('Office', 'HIGH PRIORITY', 'Front Desk Desktop', '1', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Trash Bags', '2 boxes', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Contractor-sized trash bags', '2 rolls', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Tool Box', '1', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Small Electric Screwdriver', '1', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Regular iPads', '3', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Scanner', '1', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Printer', '1', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Scissors', '2', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Packing tape', '1 roll', 'Inventory'),
+    ('Office', 'HIGH PRIORITY', 'Wire Storage Shelves', '3', 'Inventory'),
+    # OFFICE - Office Supplies
+    ('Office', 'Office Supplies', 'Nextech Credit Card Terminal', '1', 'Strategic Growth'),
+    ('Office', 'Office Supplies', 'Wireless Headset', '4', 'Inventory'),
+    ('Office', 'Office Supplies', "5' Ethernet Cords", '5-pack', 'Inventory'),
+    ('Office', 'Office Supplies', 'Extension Cords', '4', 'Inventory'),
+    ('Office', 'Office Supplies', 'iPad Covers', '3', 'Inventory'),
+    ('Office', 'Office Supplies', 'iPad Charging Station', '1', 'Inventory'),
+    ('Office', 'Office Supplies', 'Short Charging Cords for Station', '1 pack', 'Inventory'),
+    ('Office', 'Office Supplies', 'Paper Shredder', '1', 'Inventory'),
+    ('Office', 'Office Supplies', 'Label Maker', '1', 'Inventory'),
+    ('Office', 'Office Supplies', 'Safe', '1', 'Inventory'),
+    ('Office', 'Office Supplies', 'Drawer Organizers multipack', '# of rooms', 'Inventory'),
+    ('Office', 'Office Supplies', 'Drawer Organizers long', '# of rooms', 'Inventory'),
+    ('Office', 'Office Supplies', 'Drawer Organizers wide', '# of rooms', 'Inventory'),
+    ('Office', 'Office Supplies', 'Under-Cabinet Storage Bins', '# of rooms', 'Inventory'),
+    ('Office', 'Office Supplies', 'Desk Organizer for Front Desk', '3', 'Inventory'),
+    # MEDICAL
+    ('Medical', 'Medical Equipment', 'Ultrasound Machine - email GE rep', '2', 'Strategic Growth'),
+    ('Medical', 'Medical Equipment', 'Ultrasound Cart', '2', 'Strategic Growth'),
+    ('Medical', 'Medical Equipment', 'GE Software Scan Assist and Presets', '-', 'Strategic Growth'),
+    ('Medical', 'Medical Equipment', 'Hill Medical Chairs', '# of rooms', 'Strategic Growth'),
+    ('Medical', 'Medical Equipment', 'Medtronic Generator', '2', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Medtronic Pump', '2', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Stools with Back', '3', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Step Stools', '2', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Mayo Stands', '3', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Ultrasound Gel Warmers', '# of rooms', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Sharps Containers', '# of rooms', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Glove Box Holders', '# of rooms', 'Inventory'),
+    ('Medical', 'Medical Equipment', 'Pillows', '# of rooms', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Pillow Cases', '2 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Cavi-Wipes', '12 Canisters', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Amazon Shorts 200 Unisize', '200', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'McKesson Shorts 100 XL 100 XXXL', '200', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Gowns', '1 case', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Ultrasound Gel', '1 case', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Ultrasound Gel Bottles', '# of rooms', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Table paper', '2 boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', '3cc syringes', '2 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', '5cc syringes', '2 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', '10cc syringes', '2 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', '30cc syringes', '2 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', 'Slip Tip Syringes', '2 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', '18G Blunt Fill Needles', '6 Boxes', 'Inventory'),
+    ('Medical', 'Medical Supplies', '25G 1.5 Needles', '6 Boxes', 'Inventory'),
+    # IT
+    ('IT', 'IT Equipment', 'Dream Machine Pro', '', 'IT'),
+    ('IT', 'IT Equipment', 'PRO 24 POE', '', 'IT'),
+    ('IT', 'IT Equipment', 'U6 Pro', '', 'IT'),
+    ('IT', 'IT Equipment', 'G5 Dome Ultra', '', 'IT'),
+    ('IT', 'IT Equipment', 'UPS Battery Back-Up', '', 'IT'),
+    ('IT', 'IT Equipment', 'Disco Western Digital 4TB', '', 'IT'),
+    ('IT', 'IT Equipment', 'Sonos POE Speakers', '', 'IT'),
+    ('IT', 'IT Equipment', 'POE Speaker Mounts', '', 'IT'),
+    ('IT', 'IT Equipment', 'Patient Room TVs', '', 'IT'),
+    ('IT', 'IT Equipment', 'Staff Area TV', '', 'IT'),
+    ('IT', 'IT Equipment', 'Waiting Room TV', '', 'IT'),
+    ('IT', 'IT Equipment', 'TV Mounts', '', 'IT'),
+    ('IT', 'IT Equipment', 'TV Corner Mounts', '', 'IT'),
+    ('IT', 'IT Equipment', 'Access G3 Reader Pro', '', 'IT'),
+    ('IT', 'IT Equipment', 'Access Cards', '', 'IT'),
+    ('IT', 'IT Equipment', 'Access Door Hub Mini', '', 'IT'),
+    ('IT', 'IT Equipment', '10G Direct Attach Cable', '', 'IT'),
+    ('IT', 'IT Equipment', 'SFP to RJ45 Adapter', '', 'IT'),
+    ('IT', 'IT Equipment', 'WiFi Smart Chime', '', 'IT'),
+    ('IT', 'IT Equipment', 'Ethernet Cable Pack 10-Pack 10ft', '', 'IT'),
+    # MARKETING - Bulk Order
+    ('Marketing', 'Bulk Order', 'Business cards', '500', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'After Hours Cards', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Insurance cards', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Brochures Vein', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Brochures Pain', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Leg pain brochure hybrid only', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Cosmetic Sclerotherapy brochure', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Conservative treatment brochures', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Review us flyers', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Financial Hardship Form', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Pens vein only', '300', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Procedure Instructions Folders vein only', '300', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'No late legs insert', '300', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Pre and Post Instructions Eng Esp Vein', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Pre and Post Instructions Eng Esp Pain', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Pre and Post Instructions other RUS', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Vein Procedure form', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'EOB flyer', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Clinic Envelopes', '250', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Before and After Floor Decals', '# of rooms', 'Marketing'),
+    ('Marketing', 'Bulk Order', 'Review badges for staff', '# of staff', 'Marketing'),
+    # MARKETING - Laminated/Stick-On
+    ('Marketing', 'Laminated/Stick-On', 'Late policy sign', '1', 'Marketing'),
+    ('Marketing', 'Laminated/Stick-On', 'Back in 5 minutes sign', '1', 'Marketing'),
+    ('Marketing', 'Laminated/Stick-On', 'Virtual FD sign', '1', 'Marketing'),
+    ('Marketing', 'Laminated/Stick-On', 'Lunch Sign', '1', 'Marketing'),
+    ('Marketing', 'Laminated/Stick-On', 'No Sun Sign', '1', 'Marketing'),
+    ('Marketing', 'Laminated/Stick-On', 'Travel Plans Sign', '1', 'Marketing'),
+]
+
+CONSTRUCTION_TASKS_TEMPLATE = [
+    'Construction Kick-Off Call',
+    'Get Construction Timeline and Enter Dates Below',
+    'Permitting',
+    'Demolition',
+    'Layout Walls',
+    'Revise HVAC Ductwork',
+    'Electrical Above Ceiling',
+    'Framing',
+    'MEP Rough-In',
+    'One Side Sheetrock',
+    'Rough Inspection',
+    'Two Side Sheetrock',
+    'Wall Inspection',
+    'Tape/Finish Walls',
+    'Paint',
+    'Ceiling Grid Layout',
+    'Above Ceiling Inspection',
+    'Sprinkler Modifications',
+    'Install/Repair Ceiling Tiles',
+    'Millwork',
+    'Install Doors and Hardware',
+    'Install Flooring',
+    'Final Inspections',
+    'Final Clean',
+    'Punch Walk',
+]
+
 # ─── Database ───────────────────────────────────────────────────────────────
 
 def get_db():
@@ -174,29 +317,47 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (clinic_id) REFERENCES clinics(id)
         );
+        CREATE TABLE IF NOT EXISTS supply_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            clinic_id INTEGER NOT NULL,
+            tab TEXT NOT NULL,
+            category TEXT NOT NULL,
+            item_name TEXT NOT NULL,
+            default_qty TEXT,
+            amount_ordered TEXT,
+            team_ordering TEXT,
+            order_status TEXT DEFAULT 'Not Ordered',
+            expected_delivery_date DATE,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (clinic_id) REFERENCES clinics(id)
+        );
+        CREATE TABLE IF NOT EXISTS construction_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            clinic_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            start_date DATE,
+            due_date DATE,
+            status TEXT DEFAULT 'Not Started',
+            notes TEXT,
+            order_index INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (clinic_id) REFERENCES clinics(id)
+        );
     ''')
     db.commit()
 
     # Run migrations for existing databases
-    # Add new columns to clinics table if they don't exist
     new_clinic_cols = [
-        ('state', 'TEXT'),
-        ('entity', 'TEXT'),
-        ('sg_project_manager', 'TEXT'),
-        ('sg_onsite_member', 'TEXT'),
-        ('setup_week', 'TEXT'),
-        ('ops_onsite_member', 'TEXT'),
-        ('doctor_status', 'TEXT'),
-        ('site_status', 'TEXT'),
-        ('targeting_opening_month', 'TEXT'),
-        ('procedures_done_where', 'TEXT'),
-        ('paired_clinic', 'TEXT'),
-        ('total_buildout_cost', 'TEXT'),
-        ('cost_to_vip', 'TEXT'),
-        ('data_analysis_summary', 'TEXT'),
-        ('clinic_notes', 'TEXT'),
-        ('photos_videos_link', 'TEXT'),
-        ('lease_filename', 'TEXT'),
+        ('state', 'TEXT'), ('entity', 'TEXT'), ('sg_project_manager', 'TEXT'),
+        ('sg_onsite_member', 'TEXT'), ('setup_week', 'TEXT'), ('ops_onsite_member', 'TEXT'),
+        ('doctor_status', 'TEXT'), ('site_status', 'TEXT'), ('targeting_opening_month', 'TEXT'),
+        ('procedures_done_where', 'TEXT'), ('paired_clinic', 'TEXT'),
+        ('total_buildout_cost', 'TEXT'), ('cost_to_vip', 'TEXT'),
+        ('data_analysis_summary', 'TEXT'), ('clinic_notes', 'TEXT'),
+        ('photos_videos_link', 'TEXT'), ('lease_filename', 'TEXT'),
         ('supply_checkin_filename', 'TEXT'),
     ]
     existing_cols = [row[1] for row in db.execute("PRAGMA table_info(clinics)").fetchall()]
@@ -488,6 +649,24 @@ def seed_template_tasks(db, clinic_id):
         )
     db.commit()
 
+def populate_supply_items(clinic_id):
+    """Auto-populate supply items for a new clinic from master list."""
+    for (tab, category, item_name, default_qty, team) in SUPPLY_MASTER:
+        execute_db(
+            '''INSERT INTO supply_items (clinic_id, tab, category, item_name, default_qty, team_ordering, order_status)
+               VALUES (?,?,?,?,?,?,?)''',
+            (clinic_id, tab, category, item_name, default_qty, team, 'Not Ordered')
+        )
+
+def populate_construction_tasks(clinic_id):
+    """Auto-populate construction tasks for a new clinic."""
+    for i, name in enumerate(CONSTRUCTION_TASKS_TEMPLATE):
+        execute_db(
+            '''INSERT INTO construction_tasks (clinic_id, name, status, order_index)
+               VALUES (?,?,?,?)''',
+            (clinic_id, name, 'Not Started', i)
+        )
+
 # ─── Auth helpers ────────────────────────────────────────────────────────────
 
 def login_required(f):
@@ -554,7 +733,6 @@ def can_edit_task(user, task):
     return False
 
 def get_quarter(date_str):
-    """Return Q1-Q4 string for a date string YYYY-MM-DD, or None."""
     if not date_str:
         return None
     try:
@@ -565,7 +743,6 @@ def get_quarter(date_str):
         return None
 
 def save_clinic_document(file_obj, clinic_id, doc_type):
-    """Save a clinic document. Returns saved filename or None."""
     if not file_obj or not file_obj.filename:
         return None
     if not allowed_doc_file(file_obj.filename):
@@ -577,6 +754,61 @@ def save_clinic_document(file_obj, clinic_id, doc_type):
     saved_name = f'{doc_type}_{timestamp}_{filename}'
     file_obj.save(os.path.join(upload_dir, saved_name))
     return saved_name
+
+def extract_lease_data(pdf_path):
+    """Extract lease fields from PDF using PyMuPDF."""
+    data = {}
+    try:
+        import fitz
+        doc = fitz.open(pdf_path)
+        text = ''
+        for page in doc:
+            text += page.get_text()
+        doc.close()
+
+        # Monthly rent
+        rent_m = re.search(r'(?:monthly\s+(?:base\s+)?rent|base\s+rent)[^\$\d]*[\$]?\s*([\d,]+(?:\.\d{2})?)', text, re.IGNORECASE)
+        if rent_m:
+            data['monthly_rent'] = rent_m.group(1).replace(',', '')
+
+        # Security deposit
+        dep_m = re.search(r'security\s+deposit[^\$\d]*[\$]?\s*([\d,]+(?:\.\d{2})?)', text, re.IGNORECASE)
+        if dep_m:
+            data['security_deposit'] = dep_m.group(1).replace(',', '')
+
+        # TI allowance
+        ti_m = re.search(r'(?:tenant\s+improvement|TI)\s+allowance[^\$\d]*[\$]?\s*([\d,]+(?:\.\d{2})?)', text, re.IGNORECASE)
+        if ti_m:
+            data['ti_allowance'] = ti_m.group(1).replace(',', '')
+
+        # Square footage
+        sqft_m = re.search(r'([\d,]+)\s*(?:square\s+feet|sq\.?\s*ft\.?|rentable\s+(?:square\s+)?(?:feet|area))', text, re.IGNORECASE)
+        if sqft_m:
+            data['square_footage'] = sqft_m.group(1).replace(',', '')
+
+        # Dates - lease start
+        start_m = re.search(r'(?:lease\s+(?:commencement|start)\s+date|commencement\s+date)[^\d]*(\w+\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{2,4})', text, re.IGNORECASE)
+        if start_m:
+            data['lease_start_date'] = start_m.group(1)
+
+        # Lease end
+        end_m = re.search(r'(?:lease\s+(?:expiration|end|termination)\s+date|expiration\s+date)[^\d]*(\w+\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{2,4})', text, re.IGNORECASE)
+        if end_m:
+            data['lease_end_date'] = end_m.group(1)
+
+        # Landlord name
+        ll_m = re.search(r'(?:landlord|lessor)[:\s]+([A-Z][A-Za-z\s,\.]+?)(?:\n|,|\.|LLC|Inc|Corp|LP)', text)
+        if ll_m:
+            data['landlord_name'] = ll_m.group(1).strip()
+
+        # Address
+        addr_m = re.search(r'(?:premises|property|located at)[:\s]+([0-9]+[^\n,]{5,60})', text, re.IGNORECASE)
+        if addr_m:
+            data['building_address'] = addr_m.group(1).strip()
+
+    except Exception as e:
+        pass
+    return data
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
@@ -683,6 +915,11 @@ def new_clinic():
                     (clinic_id, t['name'], t['department'], t['time_phase'], due,
                      'Not Started', t['order_index'], t['template_offset_days'])
                 )
+
+        # Auto-populate supplies and construction tasks
+        populate_supply_items(clinic_id)
+        populate_construction_tasks(clinic_id)
+
         log_activity(clinic_id, None, session['user_id'], 'Clinic Created', name)
         flash(f'Clinic "{name}" created successfully!', 'success')
         return redirect(url_for('clinic_dashboard', clinic_id=clinic_id))
@@ -729,7 +966,6 @@ def edit_clinic(clinic_id):
              data_analysis, clinic_notes, photos_link, clinic_id)
         )
 
-        # Handle file uploads (only update if new file provided)
         lease_file = request.files.get('lease_file')
         supply_file = request.files.get('supply_checkin_file')
         if lease_file and lease_file.filename:
@@ -846,6 +1082,7 @@ def task_detail(task_id):
         return redirect(url_for('index'))
     clinic = query_db("SELECT * FROM clinics WHERE id=?", [task['clinic_id']], one=True)
     user = current_user()
+
     users = query_db("SELECT id, full_name, department FROM users ORDER BY full_name")
     notes = query_db(
         '''SELECT n.*, u.full_name FROM notes n JOIN users u ON n.author_id=u.id
@@ -954,7 +1191,23 @@ def lease_summary(clinic_id):
         return redirect(url_for('index'))
     lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [clinic_id], one=True)
 
+    pdf_extracted = None
     if request.method == 'POST':
+        action = request.form.get('action', 'save')
+
+        # Handle PDF upload & extraction
+        if action == 'upload_pdf':
+            pdf_file = request.files.get('lease_pdf')
+            if pdf_file and pdf_file.filename and pdf_file.filename.lower().endswith('.pdf'):
+                saved = save_clinic_document(pdf_file, clinic_id, 'lease')
+                if saved:
+                    execute_db("UPDATE clinics SET lease_filename=? WHERE id=?", (saved, clinic_id))
+                    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], 'clinics', str(clinic_id), saved)
+                    pdf_extracted = extract_lease_data(pdf_path)
+                    flash('PDF uploaded and data extracted. Review and save below.', 'success')
+                    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+            return render_template('lease_summary.html', clinic=clinic, lease=lease, pdf_extracted=pdf_extracted)
+
         fields = {
             'landlord_name': request.form.get('landlord_name', '') or None,
             'landlord_contact': request.form.get('landlord_contact', '') or None,
@@ -985,7 +1238,192 @@ def lease_summary(clinic_id):
         return redirect(url_for('lease_summary', clinic_id=clinic_id))
 
     lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [clinic_id], one=True)
-    return render_template('lease_summary.html', clinic=clinic, lease=lease)
+    return render_template('lease_summary.html', clinic=clinic, lease=lease, pdf_extracted=pdf_extracted)
+
+# ─── Supply Check-In ──────────────────────────────────────────────────────────
+
+@app.route('/clinic/<int:clinic_id>/supplies')
+@login_required
+def clinic_supplies(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    items = query_db("SELECT * FROM supply_items WHERE clinic_id=? ORDER BY tab, category, id", [clinic_id])
+    # If no items exist yet, populate them
+    if not items:
+        populate_supply_items(clinic_id)
+        items = query_db("SELECT * FROM supply_items WHERE clinic_id=? ORDER BY tab, category, id", [clinic_id])
+
+    # Organize by tab
+    tabs = ['Office', 'Medical', 'IT', 'Marketing', 'Post-Opening Orders', 'Returns']
+    tab_data = {}
+    for tab in tabs:
+        tab_items = [i for i in items if i['tab'] == tab]
+        # Group by category
+        cats = {}
+        for item in tab_items:
+            cat = item['category']
+            if cat not in cats:
+                cats[cat] = []
+            cats[cat].append(dict(item))
+        # Progress
+        total = len(tab_items)
+        delivered = sum(1 for i in tab_items if i['order_status'] == 'Delivered')
+        ordered = sum(1 for i in tab_items if i['order_status'] in ('Ordered', 'Delivered'))
+        issues = sum(1 for i in tab_items if i['order_status'] == 'Issue')
+        pct = round((delivered / total * 100) if total > 0 else 0)
+        tab_data[tab] = {'categories': cats, 'total': total, 'delivered': delivered,
+                         'ordered': ordered, 'issues': issues, 'pct': pct}
+
+    total_all = len(items)
+    ordered_all = sum(1 for i in items if i['order_status'] in ('Ordered', 'Delivered'))
+    delivered_all = sum(1 for i in items if i['order_status'] == 'Delivered')
+    issues_all = sum(1 for i in items if i['order_status'] == 'Issue')
+
+    active_tab = request.args.get('tab', 'Office')
+    return render_template('supplies.html',
+        clinic=clinic, tabs=tabs, tab_data=tab_data,
+        active_tab=active_tab,
+        total_all=total_all, ordered_all=ordered_all,
+        delivered_all=delivered_all, issues_all=issues_all,
+        supply_statuses=SUPPLY_ORDER_STATUSES)
+
+@app.route('/clinic/<int:clinic_id>/supplies/update', methods=['POST'])
+@login_required
+def update_supply_item(clinic_id):
+    item_id = request.form.get('item_id')
+    field = request.form.get('field')
+    value = request.form.get('value', '')
+    allowed_fields = ['order_status', 'expected_delivery_date', 'notes', 'amount_ordered', 'team_ordering']
+    if field not in allowed_fields:
+        return jsonify({'error': 'Invalid field'}), 400
+    execute_db(f"UPDATE supply_items SET {field}=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?",
+               (value or None, item_id, clinic_id))
+    return jsonify({'ok': True})
+
+@app.route('/clinic/<int:clinic_id>/supplies/add', methods=['POST'])
+@login_required
+def add_supply_item(clinic_id):
+    tab = request.form.get('tab', 'Post-Opening Orders')
+    category = request.form.get('category', 'Additional')
+    item_name = request.form.get('item_name', '').strip()
+    if not item_name:
+        flash('Item name required.', 'error')
+        return redirect(url_for('clinic_supplies', clinic_id=clinic_id, tab=tab))
+    team = request.form.get('team_ordering', '')
+    qty = request.form.get('default_qty', '')
+    execute_db(
+        '''INSERT INTO supply_items (clinic_id, tab, category, item_name, default_qty, team_ordering, order_status)
+           VALUES (?,?,?,?,?,?,?)''',
+        (clinic_id, tab, category, item_name, qty, team, 'Not Ordered')
+    )
+    flash('Supply item added.', 'success')
+    return redirect(url_for('clinic_supplies', clinic_id=clinic_id, tab=tab))
+
+# ─── Construction Gantt ───────────────────────────────────────────────────────
+
+@app.route('/clinic/<int:clinic_id>/construction')
+@login_required
+def clinic_construction(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    tasks = query_db("SELECT * FROM construction_tasks WHERE clinic_id=? ORDER BY order_index", [clinic_id])
+    if not tasks:
+        populate_construction_tasks(clinic_id)
+        tasks = query_db("SELECT * FROM construction_tasks WHERE clinic_id=? ORDER BY order_index", [clinic_id])
+    return render_template('construction.html',
+        clinic=clinic, tasks=tasks,
+        construction_statuses=CONSTRUCTION_STATUSES)
+
+@app.route('/clinic/<int:clinic_id>/construction/update', methods=['POST'])
+@login_required
+def update_construction_task(clinic_id):
+    task_id = request.form.get('task_id')
+    field = request.form.get('field')
+    value = request.form.get('value', '')
+    allowed = ['start_date', 'due_date', 'status', 'notes']
+    if field not in allowed:
+        return jsonify({'error': 'Invalid field'}), 400
+    execute_db(f"UPDATE construction_tasks SET {field}=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?",
+               (value or None, task_id, clinic_id))
+    return jsonify({'ok': True})
+
+@app.route('/clinic/<int:clinic_id>/construction/add', methods=['POST'])
+@login_required
+def add_construction_task(clinic_id):
+    name = request.form.get('name', '').strip()
+    if not name:
+        flash('Task name required.', 'error')
+        return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+    max_order = query_db("SELECT MAX(order_index) as m FROM construction_tasks WHERE clinic_id=?", [clinic_id], one=True)
+    next_order = (max_order['m'] or 0) + 1
+    execute_db(
+        "INSERT INTO construction_tasks (clinic_id, name, status, order_index) VALUES (?,?,?,?)",
+        (clinic_id, name, 'Not Started', next_order)
+    )
+    flash('Construction task added.', 'success')
+    return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+@app.route('/clinic/<int:clinic_id>/construction/delete/<int:task_id>', methods=['POST'])
+@admin_required
+def delete_construction_task(clinic_id, task_id):
+    execute_db("DELETE FROM construction_tasks WHERE id=? AND clinic_id=?", (task_id, clinic_id))
+    flash('Task deleted.', 'success')
+    return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+# ─── Status Report & Due This Week ────────────────────────────────────────────
+
+@app.route('/clinic/<int:clinic_id>/status-report')
+@login_required
+def status_report(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    tasks = query_db(
+        "SELECT * FROM tasks WHERE clinic_id=? AND status != 'Complete' ORDER BY department, time_phase, due_date",
+        [clinic_id]
+    )
+    today = datetime.now().date()
+    week_end = today + timedelta(days=7)
+
+    dept_tasks = {}
+    for dept in DEPARTMENTS:
+        dt = [t for t in tasks if t['department'] == dept]
+        if dt:
+            dept_tasks[dept] = dt
+
+    return render_template('status_report.html',
+        clinic=clinic, dept_tasks=dept_tasks,
+        today=str(today), week_end=str(week_end))
+
+@app.route('/due-this-week')
+@login_required
+def due_this_week():
+    today = datetime.now().date()
+    week_end = today + timedelta(days=7)
+    tasks = query_db(
+        '''SELECT t.*, c.name as clinic_name FROM tasks t
+           JOIN clinics c ON t.clinic_id = c.id
+           WHERE c.is_template=0 AND t.due_date >= ? AND t.due_date <= ?
+           AND t.status != 'Complete'
+           ORDER BY t.due_date, c.name''',
+        [str(today), str(week_end)]
+    )
+    overdue = query_db(
+        '''SELECT t.*, c.name as clinic_name FROM tasks t
+           JOIN clinics c ON t.clinic_id = c.id
+           WHERE c.is_template=0 AND t.due_date < ?
+           AND t.status != 'Complete'
+           ORDER BY t.due_date, c.name''',
+        [str(today)]
+    )
+    return render_template('due_this_week.html',
+        tasks=tasks, overdue=overdue,
+        today=str(today), week_end=str(week_end))
 
 # ─── Pipeline Tracker ─────────────────────────────────────────────────────────
 
@@ -1007,7 +1445,6 @@ def pipeline():
     q += " ORDER BY opening_date ASC NULLS LAST, name ASC"
     clinics = query_db(q, args)
 
-    # Group by quarter
     quarters = {}
     for c in clinics:
         q_label = get_quarter(c['opening_date']) or 'No Date Set'
@@ -1015,15 +1452,13 @@ def pipeline():
             quarters[q_label] = []
         quarters[q_label].append(dict(c))
 
-    # Sort quarters: put real quarters first, then "No Date Set"
     def quarter_sort_key(k):
         if k == 'No Date Set':
             return '9999'
-        parts = k.split(' ')  # e.g. ['Q2', '2025']
+        parts = k.split(' ')
         return f"{parts[1]}_{parts[0]}" if len(parts) == 2 else k
     sorted_quarters = dict(sorted(quarters.items(), key=lambda x: quarter_sort_key(x[0])))
 
-    # Get unique filter values
     all_clinics_raw = query_db("SELECT DISTINCT site_status, sg_project_manager, state FROM clinics WHERE is_template=0")
     statuses_avail = sorted(set(c['site_status'] for c in all_clinics_raw if c['site_status']))
     pms_avail = sorted(set(c['sg_project_manager'] for c in all_clinics_raw if c['sg_project_manager']))
@@ -1041,13 +1476,15 @@ def pipeline_export_csv():
     si = StringIO()
     writer = csv.writer(si)
     writer.writerow(['Clinic Name', 'State', 'Entity', 'PM', 'Site Status', 'Set Up Week',
-                     'Doctor Status', 'Opening Date', 'Ops Onsite Member', 'Targeting Month', 'Notes'])
+                     'Doctor Status', 'Opening Date', 'Ops Onsite Member', 'Targeting Month',
+                     'Total Buildout Cost', 'Cost to VIP', 'Notes'])
     for c in clinics:
         writer.writerow([
             c['name'], c['state'] or '', c['entity'] or '', c['sg_project_manager'] or '',
             c['site_status'] or '', c['setup_week'] or '', c['doctor_status'] or '',
             c['opening_date'] or '', c['ops_onsite_member'] or '',
-            c['targeting_opening_month'] or '', c['clinic_notes'] or ''
+            c['targeting_opening_month'] or '', c['total_buildout_cost'] or '',
+            c['cost_to_vip'] or '', c['clinic_notes'] or ''
         ])
     output = si.getvalue()
     return Response(output, mimetype='text/csv',
@@ -1171,6 +1608,8 @@ def delete_clinic(clinic_id):
         execute_db("DELETE FROM tasks WHERE clinic_id=?", [clinic_id])
         execute_db("DELETE FROM activity_log WHERE clinic_id=?", [clinic_id])
         execute_db("DELETE FROM lease_summaries WHERE clinic_id=?", [clinic_id])
+        execute_db("DELETE FROM supply_items WHERE clinic_id=?", [clinic_id])
+        execute_db("DELETE FROM construction_tasks WHERE clinic_id=?", [clinic_id])
         execute_db("DELETE FROM clinics WHERE id=?", [clinic_id])
         flash(f'Clinic "{clinic["name"]}" deleted.', 'success')
     return redirect(url_for('index'))

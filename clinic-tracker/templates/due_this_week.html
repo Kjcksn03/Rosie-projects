@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Due This Week | VIP Medical Group{% endblock %}
+{% block head %}
+<style>
+.due-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+.due-table th { background:var(--navy); color:#fff; padding:.6rem .9rem; text-align:left; font-weight:600; }
+.due-table td { padding:.55rem .9rem; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.due-table tr:hover td { background:#f8f9fa; }
+.overdue-row td { background:#fee2e2 !important; }
+.due-today-row td { background:#fef9c3 !important; }
+.clinic-tag { display:inline-block; background:var(--navy); color:#fff; padding:.1rem .5rem; border-radius:6px; font-size:.75rem; font-weight:600; margin-right:.3rem; }
+.dept-tag { display:inline-block; background:#e5e7eb; color:#374151; padding:.1rem .5rem; border-radius:6px; font-size:.75rem; }
+.section-header { background:var(--navy); color:#fff; padding:.7rem 1.2rem; border-radius:10px 10px 0 0; font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
+.days-badge { background:var(--gold); color:var(--navy); padding:.15rem .5rem; border-radius:8px; font-size:.8rem; font-weight:700; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1100px;margin:2rem auto;padding:0 1rem;">
+
+  <div class="page-header" style="margin-bottom:1.5rem;">
+    <div>
+      <div class="page-title">📅 Due This Week</div>
+      <div class="page-subtitle">Tasks due {{ today }} – {{ week_end }} across all clinics</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">← All Clinics</a>
+    </div>
+  </div>
+
+  <!-- Overdue -->
+  {% if overdue %}
+  <div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:1.5rem;overflow:hidden;">
+    <div class="section-header" style="background:#dc2626;">
+      <span>🚨 Overdue Tasks</span>
+      <span class="days-badge">{{ overdue|length }} tasks</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="due-table">
+        <thead>
+          <tr>
+            <th>Clinic</th>
+            <th>Task</th>
+            <th>Department</th>
+            <th>Due Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in overdue %}
+          <tr class="overdue-row">
+            <td><span class="clinic-tag">{{ task.clinic_name }}</span></td>
+            <td><a href="{{ url_for('task_detail', task_id=task.id) }}" style="color:var(--navy);font-weight:500;">{{ task.name }}</a></td>
+            <td><span class="dept-tag">{{ task.department }}</span></td>
+            <td style="color:#dc2626;font-weight:600;white-space:nowrap;">{{ task.due_date }}</td>
+            <td>{{ task.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Due This Week -->
+  <div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;">
+    <div class="section-header">
+      <span>📆 Due This Week (Next 7 Days)</span>
+      <span class="days-badge">{{ tasks|length }} tasks</span>
+    </div>
+    {% if tasks %}
+    <div style="overflow-x:auto;">
+      <table class="due-table">
+        <thead>
+          <tr>
+            <th>Clinic</th>
+            <th>Task</th>
+            <th>Department</th>
+            <th>Due Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in tasks %}
+          {% set is_today = task.due_date == today %}
+          <tr {% if is_today %}class="due-today-row"{% endif %}>
+            <td><span class="clinic-tag">{{ task.clinic_name }}</span></td>
+            <td><a href="{{ url_for('task_detail', task_id=task.id) }}" style="color:var(--navy);font-weight:500;">{{ task.name }}</a></td>
+            <td><span class="dept-tag">{{ task.department }}</span></td>
+            <td style="white-space:nowrap;{% if is_today %}color:#854d0e;font-weight:600;{% endif %}">
+              {{ task.due_date }}{% if is_today %} 🔔{% endif %}
+            </td>
+            <td>{{ task.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding:2rem;text-align:center;color:#666;">
+      🎉 No tasks due in the next 7 days!
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
