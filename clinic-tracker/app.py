@@ -5,7 +5,7 @@ import json
 import re
 from datetime import datetime, timedelta
 from functools import wraps
-from io import StringIO
+from io import StringIO, BytesIO
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask import (Flask, render_template, request, redirect, url_for,
@@ -371,6 +371,13 @@ def init_db():
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(clinic_id, week_ending)
+        );
+        CREATE TABLE IF NOT EXISTS report_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            fields TEXT NOT NULL,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     ''')
     db.commit()
@@ -1449,6 +1456,207 @@ def delete_construction_task(clinic_id, task_id):
     flash('Task deleted.', 'success')
     return redirect(url_for('clinic_construction', clinic_id=clinic_id))
 
+@app.route('/clinic/<int:clinic_id>/construction/template')
+@login_required
+def construction_download_template(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        flash('openpyxl not installed.', 'error')
+        return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Construction Timeline'
+
+    headers = ['Task Name', 'Start Date', 'Due Date', 'Notes']
+    header_fill = PatternFill(start_color='1E3A5F', end_color='1E3A5F', fill_type='solid')
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    for row, task_name in enumerate(CONSTRUCTION_TASKS_TEMPLATE, 2):
+        ws.cell(row=row, column=1, value=task_name)
+
+    ws.column_dimensions['A'].width = 42
+    ws.column_dimensions['B'].width = 15
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 35
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    safe_name = clinic['name'].replace(' ', '_').replace('/', '_')
+    filename = f'construction_timeline_{safe_name}.xlsx'
+    return Response(
+        out.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment;filename={filename}'}
+    )
+
+
+def _fuzzy_match_task(row_text, task_names):
+    """Match row_text to one of task_names via keyword overlap."""
+    row_lower = row_text.lower().strip()
+    if not row_lower:
+        return None
+    best_match = None
+    best_score = 0
+    for task in task_names:
+        task_lower = task.lower().strip()
+        if task_lower == row_lower:
+            return task
+        keywords = [w for w in task_lower.split() if len(w) > 2]
+        if not keywords:
+            continue
+        score = sum(1 for kw in keywords if kw in row_lower) / len(keywords)
+        if score > best_score and score >= 0.4:
+            best_score = score
+            best_match = task
+    return best_match
+
+
+def _parse_date_str(val):
+    """Try various date formats and return YYYY-MM-DD or None."""
+    if not val:
+        return None
+    if hasattr(val, 'strftime'):
+        return val.strftime('%Y-%m-%d')
+    s = str(val).strip()
+    for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y', '%d/%m/%Y',
+                '%B %d, %Y', '%B %d %Y', '%b %d, %Y', '%b %d %Y', '%m-%d-%Y']:
+        try:
+            return datetime.strptime(s, fmt).strftime('%Y-%m-%d')
+        except Exception:
+            pass
+    return None
+
+
+@app.route('/clinic/<int:clinic_id>/construction/upload', methods=['POST'])
+@login_required
+def upload_construction_timeline(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+
+    f = request.files.get('timeline_file')
+    if not f or not f.filename:
+        flash('No file selected.', 'error')
+        return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+    ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+    if ext not in ('xlsx', 'xls', 'pdf'):
+        flash('Please upload a PDF or Excel (.xlsx/.xls) file.', 'error')
+        return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+    matched = {}  # task_name -> {start_date, due_date}
+    unmatched_rows = []
+
+    if ext in ('xlsx', 'xls'):
+        try:
+            import openpyxl
+            file_bytes = f.read()
+            wb = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
+            ws = wb.active
+
+            # Detect header row and column positions
+            header_row = 1
+            task_col = start_col = end_col = None
+            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=5), 1):
+                for cell in row:
+                    if cell.value and isinstance(cell.value, str):
+                        v = cell.value.lower().strip()
+                        if any(kw in v for kw in ('task', 'name', 'description', 'activity', 'phase')):
+                            task_col = cell.column
+                            header_row = row_idx
+                        elif any(kw in v for kw in ('start',)) and start_col is None:
+                            start_col = cell.column
+                        elif any(kw in v for kw in ('end', 'due', 'finish', 'complete', 'target')) and end_col is None:
+                            end_col = cell.column
+                if task_col:
+                    break
+
+            task_col = task_col or 1
+            start_col = start_col or 2
+            end_col = end_col or 3
+
+            for row in ws.iter_rows(min_row=header_row + 1):
+                def get_cell_val(col):
+                    idx = col - 1
+                    return row[idx].value if idx < len(row) else None
+
+                row_text = str(get_cell_val(task_col) or '').strip()
+                if not row_text:
+                    continue
+                start_date = _parse_date_str(get_cell_val(start_col))
+                end_date = _parse_date_str(get_cell_val(end_col))
+                match = _fuzzy_match_task(row_text, CONSTRUCTION_TASKS_TEMPLATE)
+                if match:
+                    matched[match] = {'start_date': start_date, 'due_date': end_date}
+                else:
+                    unmatched_rows.append(row_text)
+        except Exception as e:
+            flash(f'Error reading Excel file: {e}', 'error')
+            return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+    elif ext == 'pdf':
+        try:
+            import fitz
+            doc = fitz.open(stream=f.read(), filetype='pdf')
+            text = ''.join(page.get_text() for page in doc)
+            doc.close()
+            date_pat = re.compile(
+                r'\b(\d{1,2}/\d{1,2}/\d{2,4}|\d{4}-\d{2}-\d{2}|\w+ \d{1,2},?\s*\d{4})\b'
+            )
+            lines = [l.strip() for l in text.split('\n')]
+            for i, line in enumerate(lines):
+                if not line:
+                    continue
+                match = _fuzzy_match_task(line, CONSTRUCTION_TASKS_TEMPLATE)
+                if match:
+                    context = ' '.join(lines[max(0, i - 1):i + 3])
+                    dates = date_pat.findall(context)
+                    matched[match] = {
+                        'start_date': _parse_date_str(dates[0]) if len(dates) > 0 else None,
+                        'due_date': _parse_date_str(dates[1]) if len(dates) > 1 else None,
+                    }
+        except Exception as e:
+            flash(f'Error reading PDF file: {e}', 'error')
+            return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
+    # Update database
+    for task_name, dates in matched.items():
+        task_row = query_db(
+            "SELECT id FROM construction_tasks WHERE clinic_id=? AND name=?",
+            [clinic_id, task_name], one=True
+        )
+        if task_row:
+            execute_db(
+                '''UPDATE construction_tasks SET start_date=?, due_date=?,
+                   updated_at=CURRENT_TIMESTAMP WHERE id=?''',
+                (dates['start_date'], dates['due_date'], task_row['id'])
+            )
+
+    matched_count = len(matched)
+    total_tasks = len(CONSTRUCTION_TASKS_TEMPLATE)
+    unmatched_names = [t for t in CONSTRUCTION_TASKS_TEMPLATE if t not in matched]
+    msg = f'Matched {matched_count}/{total_tasks} tasks.'
+    if unmatched_names:
+        display = unmatched_names[:5]
+        msg += f' Unmatched: {", ".join(display)}'
+        if len(unmatched_names) > 5:
+            msg += f' and {len(unmatched_names) - 5} more.'
+    flash(msg, 'success' if matched_count > 0 else 'warning')
+    return redirect(url_for('clinic_construction', clinic_id=clinic_id))
+
 # ─── Status Report & Due This Week ────────────────────────────────────────────
 
 @app.route('/clinic/<int:clinic_id>/status-report')
@@ -1944,6 +2152,40 @@ def reports_leases():
     return render_template('reports_leases.html', rows=rows)
 
 
+@app.route('/reports/builder/save', methods=['POST'])
+@login_required
+def save_report_template():
+    name = request.form.get('name', '').strip()
+    fields_json = request.form.get('fields', '[]')
+    try:
+        fields = json.loads(fields_json)
+    except Exception:
+        fields = request.form.getlist('fields')
+    if not name or not fields:
+        return jsonify({'error': 'Name and fields required'}), 400
+    new_id = execute_db(
+        "INSERT INTO report_templates (name, fields, created_by) VALUES (?,?,?)",
+        (name, json.dumps(fields), session['user_id'])
+    )
+    return jsonify({'ok': True, 'id': new_id, 'name': name, 'fields': fields})
+
+
+@app.route('/reports/builder/templates')
+@login_required
+def list_report_templates():
+    templates = query_db("SELECT * FROM report_templates ORDER BY created_at DESC")
+    result = [{'id': t['id'], 'name': t['name'], 'fields': json.loads(t['fields'] or '[]'),
+               'created_at': t['created_at']} for t in templates]
+    return jsonify(result)
+
+
+@app.route('/reports/builder/template/<int:template_id>', methods=['DELETE'])
+@login_required
+def delete_report_template(template_id):
+    execute_db("DELETE FROM report_templates WHERE id=?", [template_id])
+    return jsonify({'ok': True})
+
+
 @app.route('/reports/builder')
 @login_required
 def reports_builder():
@@ -2119,10 +2361,14 @@ def reports_builder():
             row = {f: all_data.get(f, '') for f in selected_fields}
             report_rows.append(row)
 
+    saved_templates = query_db("SELECT * FROM report_templates ORDER BY created_at DESC")
+    saved_templates_list = [{'id': t['id'], 'name': t['name'],
+                              'fields': json.loads(t['fields'] or '[]')} for t in saved_templates]
     return render_template('reports_builder.html',
         field_groups=FIELD_GROUPS,
         selected_fields=selected_fields,
-        report_rows=report_rows)
+        report_rows=report_rows,
+        saved_templates=saved_templates_list)
 
 
 @app.route('/reports/builder/csv')

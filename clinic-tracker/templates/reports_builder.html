@@ -54,6 +54,31 @@
     <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Back</a>
   </div>
 
+  <!-- Saved Templates Bar -->
+  <div id="templates-bar" class="no-print" style="margin-bottom:1rem;">
+    <div style="background:#fff;border-radius:10px;box-shadow:0 1px 8px rgba(0,0,0,.08);padding:.75rem 1.2rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <span style="font-size:.88rem;font-weight:700;color:var(--navy);white-space:nowrap;">📁 Saved Templates:</span>
+        <div id="templates-list" style="display:flex;gap:.5rem;flex-wrap:wrap;flex:1;">
+          <span id="no-templates-msg" style="font-size:.85rem;color:#aaa;font-style:italic;">No saved templates yet.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Template Modal -->
+  <div id="save-template-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:1.5rem 2rem;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+      <h4 style="margin:0 0 1rem;color:var(--navy);">💾 Save Report Template</h4>
+      <label style="font-size:.88rem;font-weight:600;">Template Name:</label>
+      <input id="template-name-input" type="text" class="form-control" style="margin:.4rem 0 1rem;" placeholder="e.g. Quarterly Overview" maxlength="80">
+      <div style="display:flex;gap:.6rem;justify-content:flex-end;">
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('save-template-modal').style.display='none'">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="doSaveTemplate()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div class="builder-layout no-print">
     <!-- Left: Available Fields -->
     <div class="panel">
@@ -96,6 +121,7 @@
           <div class="action-bar">
             <button id="btn-generate" class="btn btn-primary btn-sm">📊 Generate Report</button>
             <button id="btn-csv" class="btn btn-secondary btn-sm">⬇️ Export CSV</button>
+            <button id="btn-save-template" class="btn btn-secondary btn-sm" style="color:#1a3a5c;">💾 Save as Template</button>
             <button id="btn-clear" class="btn btn-secondary btn-sm" style="color:#c0392b;">🗑️ Clear All</button>
             {% if selected_fields %}
             <button onclick="window.print()" class="btn btn-secondary btn-sm">🖨️ Print</button>
@@ -269,5 +295,95 @@ function addDragEvents(el) {
 }
 
 renderSelected();
+
+// ── Saved Templates ──────────────────────────────────────────────────────────
+var savedTemplates = {{ saved_templates | tojson }};
+
+function renderTemplates() {
+  var container = document.getElementById('templates-list');
+  var noMsg = document.getElementById('no-templates-msg');
+  if (!container) return;
+  container.innerHTML = '';
+  if (savedTemplates.length === 0) {
+    if (noMsg) noMsg.style.display = '';
+    return;
+  }
+  if (noMsg) noMsg.style.display = 'none';
+  savedTemplates.forEach(function(tmpl) {
+    var wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;align-items:center;gap:0;background:#f0f4f8;border:1px solid #dde3ea;border-radius:20px;overflow:hidden;';
+
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-sm';
+    btn.style.cssText = 'background:none;border:none;border-radius:20px 0 0 20px;padding:.25rem .7rem;font-size:.82rem;color:var(--navy);font-weight:600;cursor:pointer;';
+    btn.textContent = tmpl.name;
+    btn.addEventListener('click', function() {
+      loadTemplate(tmpl.fields);
+    });
+
+    var del = document.createElement('button');
+    del.style.cssText = 'background:none;border:none;border-left:1px solid #dde3ea;padding:.25rem .5rem;font-size:.78rem;color:#999;cursor:pointer;border-radius:0 20px 20px 0;line-height:1;';
+    del.innerHTML = '✕';
+    del.title = 'Delete template';
+    del.addEventListener('click', function() {
+      if (!confirm('Delete template "' + tmpl.name + '"?')) return;
+      fetch('{{ url_for("delete_report_template", template_id=0) }}'.replace('/0', '/' + tmpl.id), {
+        method: 'DELETE'
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.ok) {
+          savedTemplates = savedTemplates.filter(function(t){ return t.id !== tmpl.id; });
+          renderTemplates();
+        }
+      });
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(del);
+    container.appendChild(wrap);
+  });
+}
+
+function loadTemplate(fields) {
+  selectedFields = fields.slice();
+  document.querySelectorAll('.field-checkbox').forEach(function(cb) {
+    cb.checked = selectedFields.includes(cb.dataset.key);
+  });
+  renderSelected();
+}
+
+// Save template button
+document.getElementById('btn-save-template').addEventListener('click', function() {
+  if (selectedFields.length === 0) { alert('Select at least one field before saving.'); return; }
+  document.getElementById('template-name-input').value = '';
+  var modal = document.getElementById('save-template-modal');
+  modal.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('template-name-input').focus(); }, 100);
+});
+
+// Close modal on backdrop click
+document.getElementById('save-template-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
+
+function doSaveTemplate() {
+  var name = document.getElementById('template-name-input').value.trim();
+  if (!name) { alert('Please enter a template name.'); return; }
+  var fd = new FormData();
+  fd.append('name', name);
+  fd.append('fields', JSON.stringify(selectedFields));
+  fetch('{{ url_for("save_report_template") }}', { method: 'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        savedTemplates.unshift({ id: d.id, name: d.name, fields: d.fields });
+        document.getElementById('save-template-modal').style.display = 'none';
+        renderTemplates();
+      } else {
+        alert('Error: ' + (d.error || 'Could not save template.'));
+      }
+    });
+}
+
+renderTemplates();
 </script>
 {% endblock %}
