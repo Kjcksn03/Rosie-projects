@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Weekly Report – VIP Weekly Updates{% endblock %}
+{% block head %}
+<style>
+@media print {
+  .site-header, .site-footer, .no-print { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ddd; }
+  .page-header { padding: 0; }
+  body { font-size: 12px; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header no-print">
+  <h1>Weekly Summary Report</h1>
+  <div class="header-actions">
+    <button onclick="window.print()" class="btn btn-outline">🖨 Print / PDF</button>
+    <a href="{{ url_for('admin_report_csv', week=week, pm_id=pm_filter or '', status=status_filter) }}"
+       class="btn btn-outline">⬇ Export CSV</a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card no-print mb-4">
+  <form method="get" class="filter-form">
+    <div class="form-group">
+      <label>Week Ending</label>
+      <select name="week">
+        {% for w in weeks %}
+        <option value="{{ w.week_ending }}" {% if w.week_ending == week %}selected{% endif %}>
+          {{ w.week_ending }}
+        </option>
+        {% endfor %}
+        <!-- Also allow typing a custom week -->
+        <option value="{{ week }}" selected>{{ week }}</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Project Manager</label>
+      <select name="pm_id">
+        <option value="">All PMs</option>
+        {% for pm in all_pms %}
+        <option value="{{ pm.id }}" {% if pm_filter == pm.id %}selected{% endif %}>
+          {{ pm.full_name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select name="status">
+        <option value="">All Statuses</option>
+        <option value="On Track" {% if status_filter == 'On Track' %}selected{% endif %}>On Track</option>
+        <option value="At Risk" {% if status_filter == 'At Risk' %}selected{% endif %}>At Risk</option>
+        <option value="Delayed" {% if status_filter == 'Delayed' %}selected{% endif %}>Delayed</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Filter</button>
+  </form>
+</div>
+
+<!-- Report Header (print) -->
+<div class="report-header">
+  <h2>VIP Medical Group – Weekly Clinic Updates</h2>
+  <p>Week Ending: <strong>{{ week }}</strong>
+    {% if pm_filter %} · PM: <strong>{{ all_pms | selectattr('id', 'equalto', pm_filter) | map(attribute='full_name') | first }}</strong>{% endif %}
+    {% if status_filter %} · Status: <strong>{{ status_filter }}</strong>{% endif %}
+  </p>
+</div>
+
+{% if updates %}
+  {% set current_clinic = namespace(name='') %}
+  {% for u in updates %}
+    {% if u.clinic_name != current_clinic.name %}
+      {% if current_clinic.name %}
+        </div><!-- end clinic-section -->
+      {% endif %}
+      {% set current_clinic.name = u.clinic_name %}
+      <div class="clinic-section card mb-4">
+        <div class="clinic-section-header">
+          <h3>{{ u.clinic_name }}</h3>
+          <div class="clinic-meta">
+            {% if u.state %}<span>{{ u.state }}</span>{% endif %}
+            {% if u.opening_date %}<span>Opens: {{ u.opening_date }}</span>{% endif %}
+          </div>
+        </div>
+    {% endif %}
+
+    <div class="update-block">
+      <div class="update-block-header">
+        <strong>{{ u.pm_name }}</strong>
+        <span class="badge badge-{{ u.status | lower | replace(' ', '-') }}">{{ u.status }}</span>
+        <span class="update-time">Submitted: {{ u.submitted_at[:16] }}</span>
+      </div>
+      <div class="update-fields">
+        {% if u.completed_this_week %}
+        <div class="update-field">
+          <div class="field-label">✅ Completed This Week</div>
+          <div class="field-value">{{ u.completed_this_week }}</div>
+        </div>
+        {% endif %}
+        {% if u.next_week %}
+        <div class="update-field">
+          <div class="field-label">📅 Next Week</div>
+          <div class="field-value">{{ u.next_week }}</div>
+        </div>
+        {% endif %}
+        {% if u.blockers %}
+        <div class="update-field highlight-red">
+          <div class="field-label">🚧 Blockers / Issues</div>
+          <div class="field-value">{{ u.blockers }}</div>
+        </div>
+        {% endif %}
+        {% if u.approvals_needed %}
+        <div class="update-field highlight-yellow">
+          <div class="field-label">✍ Approvals Needed from Kelly</div>
+          <div class="field-value">{{ u.approvals_needed }}</div>
+        </div>
+        {% endif %}
+        {% if u.help_needed %}
+        <div class="update-field highlight-yellow">
+          <div class="field-label">🙋 Help Needed from Kelly</div>
+          <div class="field-value">{{ u.help_needed }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  </div><!-- end last clinic-section -->
+{% else %}
+  <div class="card">
+    <p class="text-muted text-center">No updates found for the selected filters.</p>
+  </div>
+{% endif %}
+{% endblock %}

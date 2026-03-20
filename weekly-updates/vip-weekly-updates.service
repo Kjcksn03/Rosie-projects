@@ -1,0 +1,15 @@
+[Unit]
+Description=VIP Weekly Updates Flask App
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/weekly-updates
+Environment="PORT=5001"
+Environment="SECRET_KEY=change-me-in-production-vip2024"
+ExecStart=/usr/local/bin/gunicorn app:app --bind 0.0.0.0:5001 --workers 2 --timeout 120 --access-logfile /var/log/vip-weekly-updates.log --error-logfile /var/log/vip-weekly-updates-error.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

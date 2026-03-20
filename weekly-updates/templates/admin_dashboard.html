@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard – VIP Weekly Updates{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Admin Dashboard</h1>
+  <span class="week-badge">Week Ending: {{ week }}</span>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-num">{{ stats.total }}</div>
+    <div class="stat-label">Total Clinics</div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-num">{{ stats.on_track }}</div>
+    <div class="stat-label">On Track</div>
+  </div>
+  <div class="stat-card stat-yellow">
+    <div class="stat-num">{{ stats.at_risk }}</div>
+    <div class="stat-label">At Risk</div>
+  </div>
+  <div class="stat-card stat-red">
+    <div class="stat-num">{{ stats.delayed }}</div>
+    <div class="stat-label">Delayed</div>
+  </div>
+  <div class="stat-card stat-gray">
+    <div class="stat-num">{{ stats.missing }}</div>
+    <div class="stat-label">Missing Updates</div>
+  </div>
+</div>
+
+<!-- PM Submission Status -->
+<section class="card mb-4">
+  <h2 class="card-title">Team Submission Status – This Week</h2>
+  <div class="pm-status-grid">
+    {% for item in pm_status %}
+    <div class="pm-status-item {% if item.submitted %}submitted{% else %}missing{% endif %}">
+      <span class="pm-status-icon">{% if item.submitted %}✓{% else %}✗{% endif %}</span>
+      <span>{{ item.pm.full_name }}</span>
+    </div>
+    {% else %}
+    <p class="text-muted">No team members assigned yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Clinic Grid -->
+<section class="card">
+  <div class="card-header-row">
+    <h2 class="card-title">Clinic Status</h2>
+    <a href="{{ url_for('admin_report') }}" class="btn btn-outline">View Full Report</a>
+  </div>
+  <div class="clinic-grid">
+    {% for clinic in clinics %}
+    <div class="clinic-card status-{{ clinic.week_status | lower | replace(' ', '-') if clinic.week_status else 'none' }}">
+      <div class="clinic-card-header">
+        <strong>{{ clinic.name }}</strong>
+        {% if clinic.state %}<span class="clinic-state">{{ clinic.state }}</span>{% endif %}
+      </div>
+      <div class="clinic-card-pm">{{ clinic.pm_name or '(unassigned)' }}</div>
+      {% if clinic.opening_date %}
+      <div class="clinic-card-date">Opens: {{ clinic.opening_date }}</div>
+      {% endif %}
+      <div class="clinic-card-status">
+        {% if clinic.week_status %}
+          <span class="badge badge-{{ clinic.week_status | lower | replace(' ', '-') }}">{{ clinic.week_status }}</span>
+          <a href="{{ url_for('edit_update', update_id=clinic.update_id) }}" class="btn-sm">View</a>
+        {% else %}
+          <span class="badge badge-none">No Update</span>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted">No clinics added yet. <a href="{{ url_for('admin_clinics') }}">Add clinics →</a></p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
