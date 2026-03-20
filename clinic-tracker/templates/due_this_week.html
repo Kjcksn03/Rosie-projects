@@ -10,8 +10,12 @@
 .due-today-row td { background:#fef9c3 !important; }
 .clinic-tag { display:inline-block; background:var(--navy); color:#fff; padding:.1rem .5rem; border-radius:6px; font-size:.75rem; font-weight:600; margin-right:.3rem; }
 .dept-tag { display:inline-block; background:#e5e7eb; color:#374151; padding:.1rem .5rem; border-radius:6px; font-size:.75rem; }
+.pm-tag { display:inline-block; background:#dbeafe; color:#1e40af; padding:.1rem .5rem; border-radius:6px; font-size:.75rem; }
 .section-header { background:var(--navy); color:#fff; padding:.7rem 1.2rem; border-radius:10px 10px 0 0; font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
 .days-badge { background:var(--gold); color:var(--navy); padding:.15rem .5rem; border-radius:8px; font-size:.8rem; font-weight:700; }
+.filter-bar { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.08); padding:1rem 1.5rem; margin-bottom:1.5rem; display:flex; gap:1rem; flex-wrap:wrap; align-items:center; }
+.filter-bar select, .filter-bar input { padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:6px; font-size:.85rem; }
+.filter-bar label { font-size:.85rem; color:#374151; display:flex; align-items:center; gap:.3rem; }
 </style>
 {% endblock %}
 {% block content %}
@@ -26,6 +30,31 @@
       <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">← All Clinics</a>
     </div>
   </div>
+
+  <!-- Filter Bar -->
+  <form method="GET" class="filter-bar">
+    <select name="pm">
+      <option value="">All PMs</option>
+      {% for u in all_users %}
+      <option value="{{ u.full_name }}" {% if filter_pm == u.full_name %}selected{% endif %}>{{ u.full_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="dept">
+      <option value="">All Departments</option>
+      {% for d in all_depts %}
+      <option value="{{ d }}" {% if filter_dept == d %}selected{% endif %}>{{ d }}</option>
+      {% endfor %}
+    </select>
+    <select name="clinic">
+      <option value="">All Clinics</option>
+      {% for c in all_clinics %}
+      <option value="{{ c.id }}" {% if filter_clinic == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <label><input type="checkbox" name="due_today" value="1" {% if due_today_only %}checked{% endif %}> Due Today Only</label>
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+    <a href="{{ url_for('due_this_week') }}" class="btn btn-outline btn-sm">Clear</a>
+  </form>
 
   <!-- Overdue -->
   {% if overdue %}
@@ -43,6 +72,7 @@
             <th>Department</th>
             <th>Due Date</th>
             <th>Status</th>
+            <th>Project Manager</th>
           </tr>
         </thead>
         <tbody>
@@ -53,6 +83,7 @@
             <td><span class="dept-tag">{{ task.department }}</span></td>
             <td style="color:#dc2626;font-weight:600;white-space:nowrap;">{{ task.due_date }}</td>
             <td>{{ task.status }}</td>
+            <td>{% if task.sg_project_manager %}<span class="pm-tag">{{ task.sg_project_manager }}</span>{% else %}–{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -64,7 +95,7 @@
   <!-- Due This Week -->
   <div style="background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;">
     <div class="section-header">
-      <span>📆 Due This Week (Next 7 Days)</span>
+      <span>📆 {% if due_today_only %}Due Today{% else %}Due This Week (Next 7 Days){% endif %}</span>
       <span class="days-badge">{{ tasks|length }} tasks</span>
     </div>
     {% if tasks %}
@@ -77,6 +108,7 @@
             <th>Department</th>
             <th>Due Date</th>
             <th>Status</th>
+            <th>Project Manager</th>
           </tr>
         </thead>
         <tbody>
@@ -90,6 +122,7 @@
               {{ task.due_date }}{% if is_today %} 🔔{% endif %}
             </td>
             <td>{{ task.status }}</td>
+            <td>{% if task.sg_project_manager %}<span class="pm-tag">{{ task.sg_project_manager }}</span>{% else %}–{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -97,7 +130,7 @@
     </div>
     {% else %}
     <div style="padding:2rem;text-align:center;color:#666;">
-      🎉 No tasks due in the next 7 days!
+      🎉 No tasks due {% if due_today_only %}today{% else %}in the next 7 days{% endif %}!
     </div>
     {% endif %}
   </div>

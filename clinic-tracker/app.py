@@ -3,6 +3,9 @@ import csv
 import sqlite3
 import json
 import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from functools import wraps
 from io import StringIO, BytesIO
@@ -34,7 +37,7 @@ TIME_PHASES = [
 ]
 STATUSES = ['Not Started', 'In Progress', 'Complete', 'Blocked']
 
-SUPPLY_ORDER_STATUSES = ['Not Ordered', 'Ordered', 'Delivered', 'Issue']
+SUPPLY_ORDER_STATUSES = ['Not Ordered', 'Ordered', 'Delivered', 'Issue', 'Not Needed']
 
 CONSTRUCTION_STATUSES = ['Not Started', 'In Progress', 'Complete', 'Delayed']
 
@@ -408,15 +411,50 @@ def init_db():
         if col_name not in existing_cols:
             db.execute(f"ALTER TABLE clinics ADD COLUMN {col_name} {col_type}")
 
-    # Migrate lease_summaries to add new rent fields
+    # Migrate lease_summaries to add new rent fields + ACH/bank fields
     new_lease_cols = [
         ('base_rent', 'TEXT'), ('cam_rent', 'TEXT'), ('total_monthly_rent', 'TEXT'),
         ('annual_rent_increase_pct', 'TEXT'), ('buildout_cost_estimate', 'TEXT'),
+        ('net_cost_to_vip', 'TEXT'),
+        ('bank_name', 'TEXT'), ('account_name', 'TEXT'), ('account_number', 'TEXT'),
+        ('routing_number', 'TEXT'), ('landlord_contact', 'TEXT'), ('landlord_broker', 'TEXT'),
     ]
     existing_lease_cols = [row[1] for row in db.execute("PRAGMA table_info(lease_summaries)").fetchall()]
     for col_name, col_type in new_lease_cols:
         if col_name not in existing_lease_cols:
             db.execute(f"ALTER TABLE lease_summaries ADD COLUMN {col_name} {col_type}")
+    db.commit()
+
+    # Migrate supply_items to add photo_url
+    existing_supply_cols = [row[1] for row in db.execute("PRAGMA table_info(supply_items)").fetchall()]
+    if 'photo_url' not in existing_supply_cols:
+        db.execute("ALTER TABLE supply_items ADD COLUMN photo_url TEXT")
+        db.commit()
+        # Pre-populate photo URLs for known items
+        PHOTO_URLS = {
+            'Front Desk Desktop': 'https://m.media-amazon.com/images/I/71SNnhiRG4L.jpg',
+            'Regular iPads': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/ipad-10th-gen-finish-unselect-gallery-2-202212?wid=2560&hei=1440&fmt=jpeg',
+            'Scanner': 'https://m.media-amazon.com/images/I/71lNs9XGC6L.jpg',
+            'Printer': 'https://m.media-amazon.com/images/I/71NTpNlLFJL.jpg',
+            'Wire Storage Shelves': 'https://m.media-amazon.com/images/I/71X5qExYnxL.jpg',
+            'Paper Shredder': 'https://m.media-amazon.com/images/I/71Y-j+NVdQL.jpg',
+            'Label Maker': 'https://m.media-amazon.com/images/I/61M-xlPmhnL.jpg',
+            'Safe': 'https://m.media-amazon.com/images/I/71xlLMrBNKL.jpg',
+            'Medtronic Generator': 'https://www.medtronic.com/content/dam/medtronic-com/us-en/hcp/therapies-procedures/cardiovascular/cardiac-rhythm-disease-management/images/icd-evoque.jpg',
+        }
+        for item_name, url in PHOTO_URLS.items():
+            db.execute("UPDATE supply_items SET photo_url=? WHERE item_name=?", (url, item_name))
+        db.commit()
+
+    # Create notification_settings table
+    db.execute('''
+        CREATE TABLE IF NOT EXISTS notification_settings (
+            user_id INTEGER PRIMARY KEY REFERENCES users(id),
+            email_on_mention INTEGER DEFAULT 1,
+            email_on_overdue INTEGER DEFAULT 1,
+            email_address TEXT
+        )
+    ''')
     db.commit()
 
     # Seed admin user
@@ -716,13 +754,26 @@ def seed_template_tasks(db, clinic_id):
         )
     db.commit()
 
+SUPPLY_PHOTO_URLS = {
+    'Front Desk Desktop': 'https://m.media-amazon.com/images/I/71SNnhiRG4L.jpg',
+    'Regular iPads': 'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/ipad-10th-gen-finish-unselect-gallery-2-202212?wid=2560&hei=1440&fmt=jpeg',
+    'Scanner': 'https://m.media-amazon.com/images/I/71lNs9XGC6L.jpg',
+    'Printer': 'https://m.media-amazon.com/images/I/71NTpNlLFJL.jpg',
+    'Wire Storage Shelves': 'https://m.media-amazon.com/images/I/71X5qExYnxL.jpg',
+    'Paper Shredder': 'https://m.media-amazon.com/images/I/71Y-j+NVdQL.jpg',
+    'Label Maker': 'https://m.media-amazon.com/images/I/61M-xlPmhnL.jpg',
+    'Safe': 'https://m.media-amazon.com/images/I/71xlLMrBNKL.jpg',
+    'Medtronic Generator': 'https://www.medtronic.com/content/dam/medtronic-com/us-en/hcp/therapies-procedures/cardiovascular/cardiac-rhythm-disease-management/images/icd-evoque.jpg',
+}
+
 def populate_supply_items(clinic_id):
     """Auto-populate supply items for a new clinic from master list."""
     for (tab, category, item_name, default_qty, team) in SUPPLY_MASTER:
+        photo_url = SUPPLY_PHOTO_URLS.get(item_name)
         execute_db(
-            '''INSERT INTO supply_items (clinic_id, tab, category, item_name, default_qty, team_ordering, order_status)
-               VALUES (?,?,?,?,?,?,?)''',
-            (clinic_id, tab, category, item_name, default_qty, team, 'Not Ordered')
+            '''INSERT INTO supply_items (clinic_id, tab, category, item_name, default_qty, team_ordering, order_status, photo_url)
+               VALUES (?,?,?,?,?,?,?,?)''',
+            (clinic_id, tab, category, item_name, default_qty, team, 'Not Ordered', photo_url)
         )
 
 def populate_construction_tasks(clinic_id):
@@ -822,6 +873,36 @@ def allowed_doc_file(filename):
 def notify_user(user_id, message, link=None):
     execute_db("INSERT INTO notifications (user_id, message, link) VALUES (?,?,?)",
                (user_id, message, link))
+
+SMTP_HOST = 'smtp.gmail.com'
+SMTP_PORT = 465
+SMTP_USER = 'kellyjacksonassistant@gmail.com'
+SMTP_PASS = 'uxvjhuujudrfcnmg'
+SMTP_CC = 'kelly.jackson@vipmedicalgroup.com'
+
+def send_email(to_addr, subject, body, cc=None):
+    """Send an email via Gmail SSL. Always CCs kelly.jackson@vipmedicalgroup.com."""
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = SMTP_USER
+        msg['To'] = to_addr
+        cc_list = [SMTP_CC]
+        if cc:
+            if isinstance(cc, list):
+                cc_list += cc
+            else:
+                cc_list.append(cc)
+        msg['Cc'] = ', '.join(cc_list)
+        msg.attach(MIMEText(body, 'plain'))
+        all_recipients = [to_addr] + cc_list
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, all_recipients, msg.as_string())
+        return True
+    except Exception as e:
+        app.logger.error(f'Email send error: {e}')
+        return False
 
 def log_activity(clinic_id, task_id, user_id, action, detail=None):
     execute_db(
@@ -1071,9 +1152,10 @@ def new_clinic():
                 app.logger.info(f"  Task '{t['name']}' dept='{t['department']}' phase='{t['time_phase']}' due={due}")
                 execute_db(
                     '''INSERT INTO tasks (clinic_id, name, department, time_phase, due_date, status,
-                       order_index, template_offset_days) VALUES (?,?,?,?,?,?,?,?)''',
+                       order_index, template_offset_days, assignees) VALUES (?,?,?,?,?,?,?,?,?)''',
                     (clinic_id, t['name'], t['department'], t['time_phase'], due,
-                     'Not Started', t['order_index'], t['template_offset_days'])
+                     'Not Started', t['order_index'], t['template_offset_days'],
+                     t['assignees'] if t['assignees'] else '[]')
                 )
 
         # Auto-populate supplies, construction tasks, and expense templates
@@ -1264,7 +1346,15 @@ def clinic_tasks(clinic_id):
     tasks = query_db(q, args)
     users = query_db("SELECT id, full_name, department FROM users ORDER BY full_name")
     today_str = str(datetime.now().date())
-    return render_template('tasks.html', clinic=clinic, tasks=tasks, users=users,
+    # Group tasks by department for reliable rendering
+    from collections import OrderedDict
+    tasks_by_dept = OrderedDict()
+    for t in tasks:
+        dept = t['department']
+        if dept not in tasks_by_dept:
+            tasks_by_dept[dept] = []
+        tasks_by_dept[dept].append(t)
+    return render_template('tasks.html', clinic=clinic, tasks=tasks, tasks_by_dept=tasks_by_dept, users=users,
                            departments=DEPARTMENTS, time_phases=TIME_PHASES, statuses=STATUSES,
                            dept_filter=dept_filter, phase_filter=phase_filter, status_filter=status_filter,
                            today_str=today_str)
@@ -1354,11 +1444,26 @@ def task_detail(task_id):
                              'Note Added', content[:80])
                 mentions = re.findall(r'@(\w+)', content)
                 for username in mentions:
-                    mentioned = query_db("SELECT id FROM users WHERE username=?", [username], one=True)
+                    mentioned = query_db("SELECT * FROM users WHERE username=?", [username], one=True)
                     if mentioned and mentioned['id'] != session['user_id']:
                         notify_user(mentioned['id'],
                                    f'{user["full_name"]} mentioned you in task "{task["name"]}"',
                                    f'/task/{task_id}')
+                        # Send email notification for @mention
+                        ns = query_db("SELECT * FROM notification_settings WHERE user_id=?", [mentioned['id']], one=True)
+                        email_addr = (ns['email_address'] if ns and ns['email_address'] else None)
+                        wants_email = (ns['email_on_mention'] if ns else 1)
+                        if wants_email and email_addr:
+                            subject = f'You were mentioned in a task update — {clinic["name"]}'
+                            body = (
+                                f'Hi {mentioned["full_name"]},\n\n'
+                                f'{user["full_name"]} mentioned you in a note on the task '
+                                f'"{task["name"]}" for {clinic["name"]}:\n\n'
+                                f'"{content}"\n\n'
+                                f'View the task: /task/{task_id}\n\n'
+                                f'— VIP Medical Group Clinic Launch Tracker'
+                            )
+                            send_email(email_addr, subject, body)
                 dept_users = query_db(
                     "SELECT id FROM users WHERE department=? AND id != ?",
                     [task['department'], session['user_id']])
@@ -1525,11 +1630,19 @@ def update_supply_item(clinic_id):
     item_id = request.form.get('item_id')
     field = request.form.get('field')
     value = request.form.get('value', '')
-    allowed_fields = ['order_status', 'expected_delivery_date', 'notes', 'amount_ordered', 'team_ordering']
+    allowed_fields = ['order_status', 'expected_delivery_date', 'notes', 'amount_ordered', 'team_ordering', 'photo_url']
     if field not in allowed_fields:
         return jsonify({'error': 'Invalid field'}), 400
     execute_db(f"UPDATE supply_items SET {field}=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?",
                (value or None, item_id, clinic_id))
+    return jsonify({'ok': True})
+
+@app.route('/clinic/<int:clinic_id>/supplies/item/<int:item_id>/photo', methods=['POST'])
+@admin_required
+def update_supply_item_photo(clinic_id, item_id):
+    photo_url = request.form.get('photo_url', '').strip() or None
+    execute_db("UPDATE supply_items SET photo_url=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?",
+               (photo_url, item_id, clinic_id))
     return jsonify({'ok': True})
 
 @app.route('/clinic/<int:clinic_id>/supplies/add', methods=['POST'])
@@ -1847,25 +1960,48 @@ def status_report(clinic_id):
 def due_this_week():
     today = datetime.now().date()
     week_end = today + timedelta(days=7)
-    tasks = query_db(
-        '''SELECT t.*, c.name as clinic_name FROM tasks t
-           JOIN clinics c ON t.clinic_id = c.id
-           WHERE c.is_template=0 AND t.due_date >= ? AND t.due_date <= ?
-           AND t.status != 'Complete'
-           ORDER BY t.due_date, c.name''',
-        [str(today), str(week_end)]
-    )
-    overdue = query_db(
-        '''SELECT t.*, c.name as clinic_name FROM tasks t
-           JOIN clinics c ON t.clinic_id = c.id
-           WHERE c.is_template=0 AND t.due_date < ?
-           AND t.status != 'Complete'
-           ORDER BY t.due_date, c.name''',
-        [str(today)]
-    )
+
+    # Filters
+    filter_pm = request.args.get('pm', '')
+    filter_dept = request.args.get('dept', '')
+    filter_clinic = request.args.get('clinic', '')
+    due_today_only = request.args.get('due_today', '') == '1'
+
+    def build_query(date_condition, date_args):
+        q = '''SELECT t.*, c.name as clinic_name, c.sg_project_manager
+               FROM tasks t JOIN clinics c ON t.clinic_id = c.id
+               WHERE c.is_template=0 AND ''' + date_condition + " AND t.status != 'Complete'"
+        args = list(date_args)
+        if filter_pm:
+            q += " AND c.sg_project_manager=?"; args.append(filter_pm)
+        if filter_dept:
+            q += " AND t.department=?"; args.append(filter_dept)
+        if filter_clinic:
+            q += " AND c.id=?"; args.append(filter_clinic)
+        q += " ORDER BY t.due_date, c.name"
+        return q, args
+
+    if due_today_only:
+        tq, ta = build_query("t.due_date = ?", [str(today)])
+        tasks = query_db(tq, ta)
+        overdue = []
+    else:
+        tq, ta = build_query("t.due_date >= ? AND t.due_date <= ?", [str(today), str(week_end)])
+        tasks = query_db(tq, ta)
+        oq, oa = build_query("t.due_date < ?", [str(today)])
+        overdue = query_db(oq, oa)
+
+    # For filter dropdowns
+    all_users = query_db("SELECT id, full_name FROM users ORDER BY full_name")
+    all_depts = DEPARTMENTS
+    all_clinics = query_db("SELECT id, name FROM clinics WHERE is_template=0 ORDER BY name")
+
     return render_template('due_this_week.html',
         tasks=tasks, overdue=overdue,
-        today=str(today), week_end=str(week_end))
+        today=str(today), week_end=str(week_end),
+        all_users=all_users, all_depts=all_depts, all_clinics=all_clinics,
+        filter_pm=filter_pm, filter_dept=filter_dept, filter_clinic=filter_clinic,
+        due_today_only=due_today_only)
 
 # ─── Pipeline Tracker ─────────────────────────────────────────────────────────
 
@@ -2064,13 +2200,55 @@ def template_new_task():
     dept = request.form.get('department', '')
     phase = request.form.get('time_phase', '')
     offset = int(request.form.get('template_offset_days', 0))
+    assignees = json.dumps(request.form.getlist('assignees'))
     if name and dept:
         execute_db(
-            '''INSERT INTO tasks (clinic_id, name, department, time_phase, is_template, template_offset_days)
-               VALUES (?,?,?,?,?,?)''',
-            (tmpl['id'], name, dept, phase, 1, offset)
+            '''INSERT INTO tasks (clinic_id, name, department, time_phase, is_template, template_offset_days, assignees)
+               VALUES (?,?,?,?,?,?,?)''',
+            (tmpl['id'], name, dept, phase, 1, offset, assignees)
         )
-        flash('Template task added.', 'success')
+        # Push to all active non-template clinics
+        active_clinics = query_db(
+            "SELECT * FROM clinics WHERE is_template=0 AND status NOT IN ('Archived', 'Template')"
+        )
+        pushed_count = 0
+        for clinic in active_clinics:
+            due = calc_phase_due_date(
+                phase, clinic['opening_date'],
+                clinic['date_scouting_started'] if 'date_scouting_started' in clinic.keys() else None,
+                clinic['date_lease_signed'] if 'date_lease_signed' in clinic.keys() else None
+            )
+            # Compute order_index
+            max_order = query_db(
+                "SELECT MAX(order_index) as m FROM tasks WHERE clinic_id=? AND department=?",
+                [clinic['id'], dept], one=True
+            )
+            next_order = (max_order['m'] or 0) + 1
+            execute_db(
+                '''INSERT INTO tasks (clinic_id, name, department, time_phase, due_date, status,
+                   template_offset_days, order_index, assignees)
+                   VALUES (?,?,?,?,?,?,?,?,?)''',
+                (clinic['id'], name, dept, phase, due, 'Not Started', offset, next_order, assignees)
+            )
+            pushed_count += 1
+        flash(f'Task added to template and pushed to {pushed_count} active clinics.', 'success')
+    return redirect(url_for('template_tasks'))
+
+@app.route('/template/task/<int:task_id>/edit', methods=['POST'])
+@admin_required
+def template_edit_task(task_id):
+    name = request.form.get('name', '').strip()
+    dept = request.form.get('department', '')
+    phase = request.form.get('time_phase', '')
+    offset = request.form.get('template_offset_days', 0)
+    assignees = json.dumps(request.form.getlist('assignees'))
+    if name:
+        execute_db(
+            '''UPDATE tasks SET name=?, department=?, time_phase=?, template_offset_days=?, assignees=?
+               WHERE id=? AND is_template=1''',
+            (name, dept, phase, int(offset), assignees, task_id)
+        )
+        flash('Template task updated.', 'success')
     return redirect(url_for('template_tasks'))
 
 @app.route('/template/task/<int:task_id>/delete', methods=['POST'])
@@ -2249,6 +2427,127 @@ def weekly_report_all():
         week_ending=week_ending,
         weeks=weeks)
 
+@app.route('/weekly-report/export-csv')
+@login_required
+def weekly_report_csv():
+    import csv, io
+    week_ending = request.args.get('week', get_week_ending())
+    clinics = query_db("SELECT * FROM clinics WHERE is_template=0 ORDER BY opening_date ASC NULLS LAST, name ASC")
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Clinic', 'State', 'PM', 'Opening Date', 'Status', '% Complete', 'Supplies %',
+                     'Construction Phase', 'Highlights This Week', 'Next Week Plan',
+                     'Timeline Changes', 'Approvals Needed', 'Help Needed'])
+    for clinic in clinics:
+        report = query_db("SELECT * FROM weekly_reports WHERE clinic_id=? AND week_ending=?",
+                          [clinic['id'], week_ending], one=True)
+        total = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=?", [clinic['id']], one=True)['cnt']
+        done = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND status='Complete'", [clinic['id']], one=True)['cnt']
+        pct = round((done / total * 100) if total > 0 else 0)
+        s_total = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=?", [clinic['id']], one=True)['cnt']
+        s_del = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=? AND order_status='Delivered'", [clinic['id']], one=True)['cnt']
+        supply_pct = round((s_del / s_total * 100) if s_total > 0 else 0)
+        cur = query_db("SELECT name FROM construction_tasks WHERE clinic_id=? AND status='In Progress' ORDER BY order_index LIMIT 1", [clinic['id']], one=True)
+        if not cur:
+            cur = query_db("SELECT name FROM construction_tasks WHERE clinic_id=? AND status='Not Started' ORDER BY order_index LIMIT 1", [clinic['id']], one=True)
+        construction_phase = cur['name'] if cur else 'Complete'
+        r = dict(report) if report else {}
+        writer.writerow([
+            clinic['name'], clinic['state'] or '', clinic['sg_project_manager'] or '',
+            clinic['opening_date'] or '', r.get('status', 'Not Submitted'), f"{pct}%", f"{supply_pct}%",
+            construction_phase, r.get('highlights', ''), r.get('next_week', ''),
+            r.get('timeline_changes', ''), r.get('approvals_needed', ''), r.get('help_needed', '')
+        ])
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=weekly-report-{week_ending}.csv'}
+    )
+
+@app.route('/weekly-report/email', methods=['POST'])
+@login_required
+def weekly_report_email():
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText as MIMETextPart
+    week_ending = request.form.get('week', get_week_ending())
+    to_email = request.form.get('to_email', '').strip()
+    if not to_email:
+        flash('Please enter an email address.', 'error')
+        return redirect(url_for('weekly_report_all', week=week_ending))
+    clinics = query_db("SELECT * FROM clinics WHERE is_template=0 ORDER BY opening_date ASC NULLS LAST, name ASC")
+    on_track = at_risk = delayed = not_submitted = 0
+    rows_html = ''
+    for clinic in clinics:
+        report = query_db("SELECT * FROM weekly_reports WHERE clinic_id=? AND week_ending=?", [clinic['id'], week_ending], one=True)
+        total = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=?", [clinic['id']], one=True)['cnt']
+        done = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND status='Complete'", [clinic['id']], one=True)['cnt']
+        pct = round((done / total * 100) if total > 0 else 0)
+        r = dict(report) if report else {}
+        status = r.get('status', 'Not Submitted')
+        color = '#16a34a' if status == 'On Track' else '#d97706' if status == 'At Risk' else '#dc2626' if status == 'Delayed' else '#6b7280'
+        if status == 'On Track': on_track += 1
+        elif status == 'At Risk': at_risk += 1
+        elif status == 'Delayed': delayed += 1
+        else: not_submitted += 1
+        rows_html += f'''<tr>
+            <td style="padding:8px;border:1px solid #ddd;font-weight:600">{clinic['name']}</td>
+            <td style="padding:8px;border:1px solid #ddd">{clinic['state'] or ''}</td>
+            <td style="padding:8px;border:1px solid #ddd">{clinic['sg_project_manager'] or ''}</td>
+            <td style="padding:8px;border:1px solid #ddd">{clinic['opening_date'] or 'TBD'}</td>
+            <td style="padding:8px;border:1px solid #ddd;color:{color};font-weight:600">{status}</td>
+            <td style="padding:8px;border:1px solid #ddd">{pct}%</td>
+            <td style="padding:8px;border:1px solid #ddd">{r.get('highlights','—')}</td>
+            <td style="padding:8px;border:1px solid #ddd">{r.get('next_week','—')}</td>
+            <td style="padding:8px;border:1px solid #ddd">{r.get('timeline_changes','—')}</td>
+            <td style="padding:8px;border:1px solid #ddd">{r.get('approvals_needed','—')}</td>
+        </tr>'''
+    html_body = f'''<html><body style="font-family:Arial,sans-serif">
+    <div style="background:#1a2744;color:white;padding:20px;margin-bottom:20px">
+        <h2 style="margin:0">VIP Medical Group — Weekly Clinic Launch Report</h2>
+        <p style="margin:4px 0 0">Week Ending: {week_ending}</p>
+    </div>
+    <div style="margin-bottom:20px;padding:12px;background:#f8f9fa;border-radius:8px">
+        <strong>Summary:</strong> 
+        <span style="color:#16a34a">✅ On Track: {on_track}</span> &nbsp;|&nbsp; 
+        <span style="color:#d97706">⚠️ At Risk: {at_risk}</span> &nbsp;|&nbsp; 
+        <span style="color:#dc2626">🔴 Delayed: {delayed}</span> &nbsp;|&nbsp; 
+        <span style="color:#6b7280">⬜ Not Submitted: {not_submitted}</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#1a2744;color:white">
+            <th style="padding:10px;text-align:left">Clinic</th>
+            <th style="padding:10px;text-align:left">State</th>
+            <th style="padding:10px;text-align:left">PM</th>
+            <th style="padding:10px;text-align:left">Opening</th>
+            <th style="padding:10px;text-align:left">Status</th>
+            <th style="padding:10px;text-align:left">% Done</th>
+            <th style="padding:10px;text-align:left">This Week</th>
+            <th style="padding:10px;text-align:left">Next Week</th>
+            <th style="padding:10px;text-align:left">Timeline Changes</th>
+            <th style="padding:10px;text-align:left">Approvals Needed</th>
+        </tr></thead>
+        <tbody>{rows_html}</tbody>
+    </table>
+    <p style="color:#888;margin-top:20px;font-size:12px">Sent from VIP Medical Group Clinic Launch Tracker</p>
+    </body></html>'''
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f'VIP Medical Group — Weekly Clinic Launch Report — Week of {week_ending}'
+        msg['From'] = 'kellyjacksonassistant@gmail.com'
+        msg['To'] = to_email
+        msg['Cc'] = 'kelly.jackson@vipmedicalgroup.com'
+        msg.attach(MIMETextPart(html_body, 'html'))
+        s = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        s.login('kellyjacksonassistant@gmail.com', 'uxvjhuujudrfcnmg')
+        s.sendmail('kellyjacksonassistant@gmail.com', [to_email, 'kelly.jackson@vipmedicalgroup.com'], msg.as_string())
+        s.quit()
+        flash(f'Weekly report emailed to {to_email}!', 'success')
+    except Exception as e:
+        flash(f'Email error: {str(e)}', 'error')
+    return redirect(url_for('weekly_report_all', week=week_ending))
+
 @app.route('/clinic/<int:clinic_id>/weekly-report')
 @login_required
 def weekly_report_view(clinic_id):
@@ -2416,6 +2715,8 @@ def reports_builder():
             ('suite_unit', 'Suite/Unit'),
             ('square_footage', 'Square Footage'),
             ('landlord_name', 'Landlord Name'),
+            ('landlord_contact', 'Landlord Contact'),
+            ('landlord_broker', 'Landlord Broker'),
             ('lease_start_date', 'Lease Start'),
             ('lease_end_date', 'Lease End'),
             ('base_rent', 'Base Rent'),
@@ -2427,6 +2728,19 @@ def reports_builder():
             ('buildout_cost_estimate', 'Buildout Cost Estimate'),
             ('lease_net_cost_vip', 'Net Cost to VIP'),
             ('attorney_name', 'Attorney Name'),
+            ('bank_name', 'Bank Name'),
+            ('account_name', 'Account Name'),
+            ('account_number', 'Account Number'),
+            ('routing_number', 'Routing Number'),
+        ]),
+        ('Timeline', [
+            ('date_scouting_started', 'Date Scouting Started'),
+            ('date_lease_negotiation_started', 'Date Lease Negotiation Started'),
+            ('date_lease_signed', 'Date Lease Signed'),
+            ('target_construction_completion', 'Target Construction Completion'),
+            ('actual_construction_completion', 'Actual Construction Completion'),
+            ('actual_opening_date', 'Actual Opening Date'),
+            ('opening_date_pushback_count', 'Opening Date Pushback Count'),
         ]),
         ('Progress', [
             ('overall_pct', 'Overall % Complete'),
@@ -2543,6 +2857,12 @@ def reports_builder():
                 'buildout_cost_estimate': (lease['buildout_cost_estimate'] if lease else '') or '',
                 'lease_net_cost_vip': fmt_money(lease_net_cost_vip),
                 'attorney_name': (lease['attorney_name'] if lease else '') or '',
+                'landlord_contact': (lease['landlord_contact'] if lease else '') or '',
+                'landlord_broker': (lease['landlord_broker'] if lease else '') or '',
+                'bank_name': (lease['bank_name'] if lease else '') or '',
+                'account_name': (lease['account_name'] if lease else '') or '',
+                'account_number': (lease['account_number'] if lease else '') or '',
+                'routing_number': (lease['routing_number'] if lease else '') or '',
                 'overall_pct': f'{pct}%',
                 'tasks_complete': str(done_tasks),
                 'tasks_total': str(total_tasks),
@@ -2555,6 +2875,14 @@ def reports_builder():
                 'net_cost_vip_clinic': fmt_money(net_cost_vip_clinic),
                 'data_analysis_summary': c['data_analysis_summary'] or '',
                 'clinic_notes': c['clinic_notes'] or '',
+                # Timeline fields
+                'date_scouting_started': (c['date_scouting_started'] if 'date_scouting_started' in c.keys() else '') or '',
+                'date_lease_negotiation_started': (c['date_lease_negotiation_started'] if 'date_lease_negotiation_started' in c.keys() else '') or '',
+                'date_lease_signed': (c['date_lease_signed'] if 'date_lease_signed' in c.keys() else '') or '',
+                'target_construction_completion': (c['target_construction_completion'] if 'target_construction_completion' in c.keys() else '') or '',
+                'actual_construction_completion': (c['actual_construction_completion'] if 'actual_construction_completion' in c.keys() else '') or '',
+                'actual_opening_date': (c['actual_opening_date'] if 'actual_opening_date' in c.keys() else '') or '',
+                'opening_date_pushback_count': str(c['opening_date_pushback_count'] if 'opening_date_pushback_count' in c.keys() else ''),
             }
 
             row = {f: all_data.get(f, '') for f in selected_fields}
@@ -2591,13 +2919,24 @@ def reports_builder_csv():
         'total_monthly_rent': 'Total Monthly Rent', 'annual_rent_increase_pct': 'Annual Increase %',
         'security_deposit': 'Security Deposit', 'ti_allowance': 'TI Allowance',
         'buildout_cost_estimate': 'Buildout Cost Estimate', 'lease_net_cost_vip': 'Net Cost to VIP',
-        'attorney_name': 'Attorney Name', 'overall_pct': 'Overall % Complete',
+        'attorney_name': 'Attorney Name',
+        'landlord_contact': 'Landlord Contact', 'landlord_broker': 'Landlord Broker',
+        'bank_name': 'Bank Name', 'account_name': 'Account Name',
+        'account_number': 'Account Number', 'routing_number': 'Routing Number',
+        'overall_pct': 'Overall % Complete',
         'tasks_complete': 'Tasks Complete', 'tasks_total': 'Tasks Total',
         'tasks_overdue': 'Tasks Overdue', 'construction_phase': 'Construction Phase',
         'supplies_pct': 'Supplies % Delivered', 'total_expenses': 'Total Expenses',
         'buildout_cost': 'Buildout Cost (clinics)', 'ti_allowance_clinic': 'TI Allowance (clinics)',
         'net_cost_vip_clinic': 'Net Cost to VIP (clinics)',
         'data_analysis_summary': 'Data Analysis Summary', 'clinic_notes': 'Clinic Notes',
+        'date_scouting_started': 'Date Scouting Started',
+        'date_lease_negotiation_started': 'Date Lease Negotiation Started',
+        'date_lease_signed': 'Date Lease Signed',
+        'target_construction_completion': 'Target Construction Completion',
+        'actual_construction_completion': 'Actual Construction Completion',
+        'actual_opening_date': 'Actual Opening Date',
+        'opening_date_pushback_count': 'Opening Date Pushback Count',
     }
 
     clinics = query_db(
@@ -2693,6 +3032,12 @@ def reports_builder_csv():
             'buildout_cost_estimate': (lease['buildout_cost_estimate'] if lease else '') or '',
             'lease_net_cost_vip': fmt_money(lease_net_cost_vip),
             'attorney_name': (lease['attorney_name'] if lease else '') or '',
+            'landlord_contact': (lease['landlord_contact'] if lease else '') or '',
+            'landlord_broker': (lease['landlord_broker'] if lease else '') or '',
+            'bank_name': (lease['bank_name'] if lease else '') or '',
+            'account_name': (lease['account_name'] if lease else '') or '',
+            'account_number': (lease['account_number'] if lease else '') or '',
+            'routing_number': (lease['routing_number'] if lease else '') or '',
             'overall_pct': f'{pct}%',
             'tasks_complete': str(done_tasks),
             'tasks_total': str(total_tasks),
@@ -2705,6 +3050,13 @@ def reports_builder_csv():
             'net_cost_vip_clinic': fmt_money(net_cost_vip_clinic),
             'data_analysis_summary': c['data_analysis_summary'] or '',
             'clinic_notes': c['clinic_notes'] or '',
+            'date_scouting_started': (c['date_scouting_started'] if 'date_scouting_started' in c.keys() else '') or '',
+            'date_lease_negotiation_started': (c['date_lease_negotiation_started'] if 'date_lease_negotiation_started' in c.keys() else '') or '',
+            'date_lease_signed': (c['date_lease_signed'] if 'date_lease_signed' in c.keys() else '') or '',
+            'target_construction_completion': (c['target_construction_completion'] if 'target_construction_completion' in c.keys() else '') or '',
+            'actual_construction_completion': (c['actual_construction_completion'] if 'actual_construction_completion' in c.keys() else '') or '',
+            'actual_opening_date': (c['actual_opening_date'] if 'actual_opening_date' in c.keys() else '') or '',
+            'opening_date_pushback_count': str(c['opening_date_pushback_count'] if 'opening_date_pushback_count' in c.keys() else ''),
         }
 
         writer.writerow([all_data.get(f, '') for f in selected_fields])
@@ -2803,6 +3155,97 @@ def reports_timeline():
         total_pushbacks=total_pushbacks,
     )
 
+
+# ─── Overdue Notifications ───────────────────────────────────────────────────
+
+@app.route('/notify/overdue')
+@admin_required
+def notify_overdue():
+    today_str = str(datetime.now().date())
+    overdue_tasks = query_db(
+        '''SELECT t.*, c.name as clinic_name FROM tasks t
+           JOIN clinics c ON t.clinic_id = c.id
+           WHERE c.is_template=0 AND t.due_date < ? AND t.status != 'Complete'
+           ORDER BY t.assignees, t.due_date''',
+        [today_str]
+    )
+
+    # Group by assignee
+    assignee_tasks = {}
+    for task in overdue_tasks:
+        try:
+            assignee_ids = json.loads(task['assignees'] or '[]')
+        except Exception:
+            assignee_ids = []
+        for uid in assignee_ids:
+            uid = int(uid)
+            if uid not in assignee_tasks:
+                assignee_tasks[uid] = []
+            assignee_tasks[uid].append(task)
+
+    sent_count = 0
+    for uid, tasks_list in assignee_tasks.items():
+        assignee = query_db("SELECT * FROM users WHERE id=?", [uid], one=True)
+        if not assignee:
+            continue
+        ns = query_db("SELECT * FROM notification_settings WHERE user_id=?", [uid], one=True)
+        email_addr = ns['email_address'] if ns and ns['email_address'] else None
+        wants_email = ns['email_on_overdue'] if ns else 1
+        if wants_email and email_addr:
+            task_lines = '\n'.join([
+                f'  - [{t["clinic_name"]}] {t["name"]} (due {t["due_date"]})'
+                for t in tasks_list
+            ])
+            subject = f'Overdue Tasks Reminder — VIP Medical Group'
+            body = (
+                f'Hi {assignee["full_name"]},\n\n'
+                f'You have {len(tasks_list)} overdue task(s):\n\n'
+                f'{task_lines}\n\n'
+                f'Please update these tasks in the Clinic Launch Tracker.\n\n'
+                f'— VIP Medical Group Clinic Launch Tracker'
+            )
+            if send_email(email_addr, subject, body):
+                sent_count += 1
+
+    # Send Kelly a summary
+    all_lines = '\n'.join([
+        f'  - [{t["clinic_name"]}] {t["name"]} (due {t["due_date"]}, status: {t["status"]})'
+        for t in overdue_tasks
+    ])
+    summary_body = (
+        f'Hi Kelly,\n\nOverdue task summary ({len(overdue_tasks)} total):\n\n'
+        f'{all_lines}\n\n'
+        f'— VIP Medical Group Clinic Launch Tracker'
+    )
+    send_email(SMTP_CC, 'Overdue Tasks Summary — Clinic Launch Tracker', summary_body)
+
+    flash(f'Overdue notifications sent to {sent_count} team members. Summary sent to Kelly.', 'success')
+    return redirect(request.referrer or url_for('index'))
+
+# ─── Notification Settings ────────────────────────────────────────────────────
+
+@app.route('/settings/notifications', methods=['GET', 'POST'])
+@login_required
+def notification_settings_view():
+    uid = session['user_id']
+    ns = query_db("SELECT * FROM notification_settings WHERE user_id=?", [uid], one=True)
+    if request.method == 'POST':
+        email_addr = request.form.get('email_address', '').strip() or None
+        on_mention = 1 if request.form.get('email_on_mention') else 0
+        on_overdue = 1 if request.form.get('email_on_overdue') else 0
+        if ns:
+            execute_db(
+                "UPDATE notification_settings SET email_address=?, email_on_mention=?, email_on_overdue=? WHERE user_id=?",
+                (email_addr, on_mention, on_overdue, uid)
+            )
+        else:
+            execute_db(
+                "INSERT INTO notification_settings (user_id, email_address, email_on_mention, email_on_overdue) VALUES (?,?,?,?)",
+                (uid, email_addr, on_mention, on_overdue)
+            )
+        flash('Notification settings saved.', 'success')
+        return redirect(url_for('notification_settings_view'))
+    return render_template('notification_settings.html', ns=ns)
 
 # ─── Due-date notifications check ────────────────────────────────────────────
 

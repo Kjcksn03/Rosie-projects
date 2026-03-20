@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Master Template – VIP Clinic Launch Tracker{% endblock %}
+{% block head %}
+<style>
+.assignee-badge { display:inline-block; background:#e0e7ff; color:#3730a3; padding:.1rem .4rem; border-radius:6px; font-size:.75rem; margin:1px; }
+/* Edit modal */
+.edit-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; align-items:center; justify-content:center; }
+.edit-modal-overlay.active { display:flex; }
+.edit-modal { background:#fff; border-radius:12px; padding:1.5rem; max-width:540px; width:90%; max-height:90vh; overflow:auto; }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container">
   <div class="page-header">
@@ -43,6 +52,17 @@
             <small class="text-muted">Negative = before opening</small>
           </div>
         </div>
+        <div class="form-group" style="margin-top:.5rem;">
+          <label class="form-label">Default Assignees</label>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
+            {% for u in users %}
+            <label style="display:inline-flex;align-items:center;gap:.3rem;font-size:.85rem;cursor:pointer;">
+              <input type="checkbox" name="assignees" value="{{ u.id }}">
+              {{ u.full_name }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
         <button type="submit" class="btn btn-gold">Add Task</button>
       </form>
     </div>
@@ -52,7 +72,7 @@
   {% set ns = namespace(current_dept='') %}
   {% for task in tasks %}
     {% if task.department != ns.current_dept %}
-      {% if ns.current_dept != '' %}</tbody></table></div></div>{% endif %}
+      {% if ns.current_dept != '' %}</tbody></table></div></div></div>{% endif %}
       {% set ns.current_dept = task.department %}
       <div class="dept-section">
         <div class="dept-header">
@@ -69,6 +89,7 @@
               <th>Task Name</th>
               <th>Phase</th>
               <th>Days from Opening</th>
+              <th>Default Assignees</th>
               <th></th>
             </tr>
           </thead>
@@ -79,6 +100,14 @@
       <td><span class="badge badge-not-started">{{ task.time_phase or '–' }}</span></td>
       <td>{{ task.template_offset_days }}</td>
       <td>
+        {% set assignee_ids = task.assignees | from_json %}
+        {% for uid in assignee_ids %}
+          {% for u in users %}{% if u.id|string == uid|string %}<span class="assignee-badge">{{ u.full_name }}</span>{% endif %}{% endfor %}
+        {% endfor %}
+        {% if not assignee_ids %}–{% endif %}
+      </td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-outline btn-xs" onclick="openEditModal({{ task.id }}, '{{ task.name | e }}', '{{ task.department | e }}', '{{ task.time_phase or '' | e }}', {{ task.template_offset_days }}, {{ task.assignees or '[]' }})">✏️ Edit</button>
         <form method="POST" action="{{ url_for('template_delete_task', task_id=task.id) }}" class="confirm-delete" style="display:inline">
           <button class="btn btn-danger btn-xs">Delete</button>
         </form>
@@ -87,4 +116,76 @@
   {% endfor %}
   {% if tasks %}</tbody></table></div></div></div>{% endif %}
 </div>
+
+<!-- Edit Task Modal -->
+<div class="edit-modal-overlay" id="editModalOverlay" onclick="if(event.target===this)closeEditModal()">
+  <div class="edit-modal">
+    <h3 style="margin-top:0;color:var(--navy);">✏️ Edit Template Task</h3>
+    <form method="POST" id="editTaskForm" action="">
+      <div class="form-group">
+        <label class="form-label">Task Name</label>
+        <input type="text" name="name" id="editName" class="form-control" required>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <select name="department" id="editDept" class="form-control">
+            {% for d in departments %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time Phase</label>
+          <select name="time_phase" id="editPhase" class="form-control">
+            <option value="">–</option>
+            {% for p in time_phases %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Days from Opening</label>
+        <input type="number" name="template_offset_days" id="editOffset" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Default Assignees</label>
+        <div id="editAssigneesContainer" style="display:flex;flex-wrap:wrap;gap:.4rem;">
+          {% for u in users %}
+          <label style="display:inline-flex;align-items:center;gap:.3rem;font-size:.85rem;cursor:pointer;">
+            <input type="checkbox" class="edit-assignee-cb" name="assignees" value="{{ u.id }}" data-uid="{{ u.id }}">
+            {{ u.full_name }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex;gap:1rem;margin-top:1rem;">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(taskId, name, dept, phase, offset, assignees) {
+  document.getElementById('editTaskForm').action = '/template/task/' + taskId + '/edit';
+  document.getElementById('editName').value = name;
+  document.getElementById('editDept').value = dept;
+  document.getElementById('editPhase').value = phase;
+  document.getElementById('editOffset').value = offset;
+  // Reset checkboxes
+  document.querySelectorAll('.edit-assignee-cb').forEach(function(cb) {
+    cb.checked = assignees.includes(parseInt(cb.dataset.uid)) || assignees.includes(cb.dataset.uid);
+  });
+  document.getElementById('editModalOverlay').classList.add('active');
+}
+function closeEditModal() {
+  document.getElementById('editModalOverlay').classList.remove('active');
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeEditModal();
+});
+</script>
 {% endblock %}

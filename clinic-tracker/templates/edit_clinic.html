@@ -185,16 +185,7 @@
               <input type="file" name="lease_file" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls">
               <small class="text-muted">Upload new to replace existing</small>
             </div>
-            <div class="form-group">
-              <label>📋 Supply Check-In List</label>
-              {% if clinic.supply_checkin_filename %}
-              <p style="font-size:.85rem;margin:0 0 .4rem;">
-                Current: <a href="{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.supply_checkin_filename) }}" target="_blank">{{ clinic.supply_checkin_filename }}</a>
-              </p>
-              {% endif %}
-              <input type="file" name="supply_checkin_file" class="form-control" accept=".pdf,.docx,.doc,.xlsx,.xls">
-              <small class="text-muted">Upload new to replace existing</small>
-            </div>
+
           </div>
         </div>
 

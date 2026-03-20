@@ -20,7 +20,8 @@
 .status-Ordered { background:#fef9c3; color:#854d0e; }
 .status-Delivered { background:#dcfce7; color:#166534; }
 .status-Issue { background:#fce7f3; color:#9d174d; }
-.inline-edit { border:1px solid transparent; background:transparent; padding:.2rem .4rem; border-radius:4px; width:100%; min-width:80px; font-size:.88rem; }
+.status-Not-Needed { background:#e5e7eb; color:#374151; }
+.inline-edit { border:1px solid transparent; background:transparent; padding:.2rem .4rem; border-radius:4px; width:100%; min-width:60px; font-size:.88rem; }
 .inline-edit:focus { border-color:var(--navy); background:#fff; outline:none; }
 .summary-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:1rem; margin-bottom:1.5rem; }
 .summary-card { background:#fff; border-radius:10px; padding:1rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.08); }
@@ -31,6 +32,14 @@
 .rooms-bar input { width:80px; padding:.35rem .5rem; border:2px solid var(--navy); border-radius:6px; font-size:1rem; text-align:center; }
 .add-item-row { background:#f8f9fa; }
 .add-item-row td { padding:.7rem .8rem; }
+.item-photo-link { cursor:pointer; color:var(--navy); text-decoration:underline dotted; }
+.item-photo-link:hover { color:var(--gold); }
+/* Modal */
+.photo-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:9999; align-items:center; justify-content:center; }
+.photo-modal-overlay.active { display:flex; }
+.photo-modal { background:#fff; border-radius:12px; padding:1.5rem; max-width:600px; width:90%; max-height:90vh; overflow:auto; position:relative; }
+.photo-modal img { max-width:100%; border-radius:8px; display:block; margin:0 auto; }
+.photo-modal-close { position:absolute; top:.8rem; right:1rem; font-size:1.5rem; cursor:pointer; background:none; border:none; color:#333; }
 @media(max-width:700px){
   .supply-table { font-size:.8rem; }
   .supply-table th, .supply-table td { padding:.4rem .5rem; }
@@ -131,32 +140,43 @@
           <thead>
             <tr>
               <th>Item</th>
-              <th class="hide-mobile">Default Qty</th>
+              <th class="hide-mobile">Qty Ordered</th>
               <th class="hide-mobile">Team</th>
               <th>Status</th>
               <th class="hide-mobile">Expected Delivery</th>
               <th>Notes</th>
+              {% if session.role in ('admin', 'dept_head') %}<th class="hide-mobile">Photo URL</th>{% endif %}
             </tr>
           </thead>
           <tbody>
             {% for item in items %}
             <tr data-item-id="{{ item.id }}">
               <td>
+                {% if item.photo_url %}
+                <span class="item-photo-link" onclick="showPhoto('{{ item.item_name | e }}', '{{ item.photo_url | e }}')">
+                  📷 <strong>{{ item.item_name }}</strong>
+                </span>
+                {% else %}
                 <strong>{{ item.item_name }}</strong>
-                {% if item.amount_ordered %}
-                <div style="font-size:.78rem;color:#666;">Ordered: {{ item.amount_ordered }}</div>
                 {% endif %}
+                <div style="font-size:.78rem;color:#666;">
+                  <span class="qty-display" data-rooms="{{ item.default_qty }}">
+                    {% if item.default_qty == '# of rooms' or item.default_qty == '# of staff' %}
+                      <em>{{ item.default_qty }}</em>
+                    {% else %}
+                      Default: {{ item.default_qty or '–' }}
+                    {% endif %}
+                  </span>
+                </div>
               </td>
               <td class="hide-mobile">
-                <span class="qty-display" data-rooms="{{ item.default_qty }}">
-                  {% if item.default_qty == '# of rooms' or item.default_qty == '# of staff' %}
-                    <em style="color:#888;">{{ item.default_qty }}</em>
-                  {% else %}
-                    {{ item.default_qty or '–' }}
-                  {% endif %}
-                </span>
+                <input type="number" class="inline-edit" data-field="amount_ordered"
+                  value="{{ item.amount_ordered or '' }}" placeholder="Qty" style="width:70px;">
               </td>
-              <td class="hide-mobile" style="font-size:.82rem;color:#555;">{{ item.team_ordering or '–' }}</td>
+              <td class="hide-mobile">
+                <input type="text" class="inline-edit" data-field="team_ordering"
+                  value="{{ item.team_ordering or '' }}" placeholder="Team" style="min-width:80px;">
+              </td>
               <td>
                 <select class="inline-edit status-select" data-field="order_status" style="width:130px;">
                   {% for s in supply_statuses %}
@@ -172,6 +192,12 @@
                 <input type="text" class="inline-edit" data-field="notes"
                   value="{{ item.notes or '' }}" placeholder="Notes...">
               </td>
+              {% if session.role in ('admin', 'dept_head') %}
+              <td class="hide-mobile">
+                <input type="text" class="inline-edit" data-field="photo_url"
+                  value="{{ item.photo_url or '' }}" placeholder="https://..." style="min-width:120px;">
+              </td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
@@ -209,7 +235,30 @@
 
 </div>
 
+<!-- Photo Modal -->
+<div class="photo-modal-overlay" id="photoModalOverlay" onclick="closePhotoModal(event)">
+  <div class="photo-modal">
+    <button class="photo-modal-close" onclick="document.getElementById('photoModalOverlay').classList.remove('active')">✕</button>
+    <h3 id="photoModalTitle" style="margin-top:0;margin-bottom:1rem;color:var(--navy);"></h3>
+    <img id="photoModalImg" src="" alt="Supply item photo">
+  </div>
+</div>
+
 <script>
+function showPhoto(name, url) {
+  document.getElementById('photoModalTitle').textContent = name;
+  document.getElementById('photoModalImg').src = url;
+  document.getElementById('photoModalOverlay').classList.add('active');
+}
+function closePhotoModal(e) {
+  if (e.target === document.getElementById('photoModalOverlay')) {
+    document.getElementById('photoModalOverlay').classList.remove('active');
+  }
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') document.getElementById('photoModalOverlay').classList.remove('active');
+});
+
 // Inline edit: auto-save on change/blur
 document.querySelectorAll('[data-item-id]').forEach(function(row) {
   var itemId = row.dataset.itemId;
@@ -225,11 +274,19 @@ document.querySelectorAll('[data-item-id]').forEach(function(row) {
         if(d.ok) {
           el.style.borderColor = '#16a34a';
           setTimeout(function(){ el.style.borderColor = ''; }, 1200);
-          // Update status badge color if status select
-          if (field === 'order_status') {
-            var statusClass = 'status-' + el.value.replace(/ /g,'-');
-            // Just refresh page to update progress bars
-            // (lightweight: no full reload, just page refresh after a moment)
+          // If photo_url updated, update the item name link
+          if (field === 'photo_url') {
+            var row2 = el.closest('tr');
+            var nameCell = row2.querySelector('td:first-child strong');
+            if (nameCell && el.value) {
+              var span = nameCell.parentElement;
+              if (!span.classList.contains('item-photo-link')) {
+                span.style.cursor = 'pointer';
+                span.style.color = 'var(--navy)';
+                span.innerHTML = '📷 <strong>' + nameCell.textContent + '</strong>';
+                span.onclick = function() { showPhoto(nameCell.textContent, el.value); };
+              }
+            }
           }
         }
       });

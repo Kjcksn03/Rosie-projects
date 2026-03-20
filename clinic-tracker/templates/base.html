@@ -37,6 +37,10 @@
         🔔 Alerts
         <span class="notif-badge" {% if unread_count() == 0 %}style="display:none"{% endif %}>{{ unread_count() }}</span>
       </a>
+      <a href="{{ url_for('notification_settings_view') }}">⚙️ Notif Settings</a>
+      {% if session.role == 'admin' %}
+      <a href="{{ url_for('notify_overdue') }}" onclick="return confirm('Send overdue emails to all assignees?')">📧 Send Overdue</a>
+      {% endif %}
       <span style="color:var(--gold);margin-right:8px;">👤 {{ session.full_name }}</span>
       <a href="{{ url_for('logout') }}" style="background:rgba(255,255,255,0.15);color:white;padding:6px 14px;border-radius:6px;text-decoration:none;font-size:14px;">Logout</a>
     </div>

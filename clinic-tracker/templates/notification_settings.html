@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Notification Settings | VIP Medical Group{% endblock %}
+{% block content %}
+<div class="container" style="max-width:600px;margin:2rem auto;padding:0 1rem;">
+  <div class="page-header">
+    <div class="page-title">🔔 Notification Settings</div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Notification Email Address</label>
+          <input type="email" name="email_address" class="form-control"
+            value="{{ ns.email_address if ns and ns.email_address else '' }}"
+            placeholder="your@email.com">
+          <small class="text-muted">Where to receive email notifications</small>
+        </div>
+        <div class="form-group" style="margin-top:1rem;">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" name="email_on_mention"
+              {% if not ns or ns.email_on_mention %}checked{% endif %}>
+            Email me when I'm @mentioned in a task note
+          </label>
+        </div>
+        <div class="form-group" style="margin-top:.5rem;">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" name="email_on_overdue"
+              {% if not ns or ns.email_on_overdue %}checked{% endif %}>
+            Email me overdue task reminders
+          </label>
+        </div>
+        <div style="margin-top:1.5rem;display:flex;gap:1rem;">
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+          <a href="{{ url_for('index') }}" class="btn btn-outline">← Back</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
