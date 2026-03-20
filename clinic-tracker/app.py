@@ -394,6 +394,14 @@ def init_db():
         ('supply_checkin_filename', 'TEXT'),
         ('lease_signed_date', 'TEXT'),
         ('buildout_cost', 'REAL'), ('ti_allowance', 'REAL'), ('ti_paid_by_vip', 'REAL'),
+        # Timeline tracking fields
+        ('date_scouting_started', 'TEXT'),
+        ('date_lease_negotiation_started', 'TEXT'),
+        ('date_lease_signed', 'TEXT'),
+        ('target_construction_completion', 'TEXT'),
+        ('actual_construction_completion', 'TEXT'),
+        ('actual_opening_date', 'TEXT'),
+        ('opening_date_pushback_count', 'INTEGER DEFAULT 0'),
     ]
     existing_cols = [row[1] for row in db.execute("PRAGMA table_info(clinics)").fetchall()]
     for col_name, col_type in new_clinic_cols:
@@ -430,6 +438,20 @@ def init_db():
         tmpl_id = cur.lastrowid
         db.commit()
         seed_template_tasks(db, tmpl_id)
+    else:
+        # Verify template tasks have correct departments — re-seed if any dept is missing
+        tmpl_id = tmpl['id']
+        existing_depts = set(
+            r[0] for r in db.execute(
+                "SELECT DISTINCT department FROM tasks WHERE clinic_id=?", (tmpl_id,)
+            ).fetchall()
+        )
+        expected_depts = set(DEPARTMENTS)
+        if not expected_depts.issubset(existing_depts):
+            # Missing departments — delete and re-seed
+            db.execute("DELETE FROM tasks WHERE clinic_id=?", (tmpl_id,))
+            db.commit()
+            seed_template_tasks(db, tmpl_id)
 
     db.close()
 
@@ -896,6 +918,40 @@ def extract_lease_data(pdf_path):
         pass
     return data
 
+def calc_phase_due_date(time_phase, opening_date_str, date_scouting_started=None, date_lease_signed=None):
+    """Calculate due date for a task based on its phase and available base dates."""
+    def parse_d(s):
+        if not s:
+            return None
+        try:
+            return datetime.strptime(s, '%Y-%m-%d').date()
+        except Exception:
+            return None
+
+    od = parse_d(opening_date_str)
+    sd = parse_d(date_scouting_started)
+    ld = parse_d(date_lease_signed)
+
+    phase_map = {
+        'Scouting': sd if sd else (od - timedelta(days=150) if od else None),
+        'After Lease Signed': (ld + timedelta(days=14)) if ld else None,
+        '2 Months Before Opening': (od - timedelta(days=60)) if od else None,
+        '1 Month Before Opening': (od - timedelta(days=30)) if od else None,
+        '2 Weeks Before Opening': (od - timedelta(days=14)) if od else None,
+        '1 Week Before Opening': (od - timedelta(days=7)) if od else None,
+        'Week Before Opening': (od - timedelta(days=7)) if od else None,
+        'Opening Day': od,
+        '1 Week After Opening': (od + timedelta(days=7)) if od else None,
+        '1 Month After Opening': (od + timedelta(days=30)) if od else None,
+        '2 Months After Opening': (od + timedelta(days=60)) if od else None,
+        '3 Months After Opening': (od + timedelta(days=90)) if od else None,
+        'When New Provider Hired': None,
+    }
+
+    result = phase_map.get(time_phase)
+    return str(result) if result else None
+
+
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -956,6 +1012,16 @@ def new_clinic():
         data_analysis = request.form.get('data_analysis_summary', '') or None
         clinic_notes = request.form.get('clinic_notes', '') or None
         photos_link = request.form.get('photos_videos_link', '') or None
+        # Timeline milestone fields
+        date_scouting_started = request.form.get('date_scouting_started', '') or None
+        date_lease_negotiation_started = request.form.get('date_lease_negotiation_started', '') or None
+        date_lease_signed = request.form.get('date_lease_signed', '') or None
+        target_construction_completion = request.form.get('target_construction_completion', '') or None
+        # Sync date_lease_signed → lease_signed_date
+        if date_lease_signed and not lease_signed_date:
+            lease_signed_date = date_lease_signed
+        elif lease_signed_date and not date_lease_signed:
+            date_lease_signed = lease_signed_date
 
         if not name:
             flash('Clinic name is required.', 'error')
@@ -966,13 +1032,17 @@ def new_clinic():
                sg_project_manager, sg_onsite_member, setup_week, ops_onsite_member,
                doctor_status, site_status, targeting_opening_month, procedures_done_where,
                paired_clinic, total_buildout_cost, cost_to_vip, data_analysis_summary,
-               clinic_notes, photos_videos_link)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+               clinic_notes, photos_videos_link, lease_signed_date,
+               date_scouting_started, date_lease_negotiation_started, date_lease_signed,
+               target_construction_completion)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (name, opening_date, session['user_id'], state, entity,
              sg_pm, sg_onsite, setup_week, ops_onsite,
              doctor_status, site_status, targeting_month, procedures_done_where,
              paired_clinic, total_buildout_cost, cost_to_vip, data_analysis,
-             clinic_notes, photos_link)
+             clinic_notes, photos_link, lease_signed_date,
+             date_scouting_started, date_lease_negotiation_started, date_lease_signed,
+             target_construction_completion)
         )
 
         # Handle file uploads
@@ -987,15 +1057,18 @@ def new_clinic():
             if saved:
                 execute_db("UPDATE clinics SET supply_checkin_filename=? WHERE id=?", (saved, clinic_id))
 
-        # Copy template tasks
+        # Copy template tasks with phase-based due date calculation
         tmpl = query_db("SELECT * FROM clinics WHERE is_template=1", one=True)
         if tmpl:
             tmpl_tasks = query_db("SELECT * FROM tasks WHERE clinic_id=?", [tmpl['id']])
+            app.logger.info(f"Copying {len(tmpl_tasks)} template tasks to clinic {clinic_id}")
             for t in tmpl_tasks:
-                due = None
-                if opening_date and t['template_offset_days'] is not None:
-                    od = datetime.strptime(opening_date, '%Y-%m-%d')
-                    due = (od + timedelta(days=t['template_offset_days'])).strftime('%Y-%m-%d')
+                # Use phase-based due date logic (Change 3)
+                due = calc_phase_due_date(
+                    t['time_phase'], opening_date,
+                    date_scouting_started, date_lease_signed
+                )
+                app.logger.info(f"  Task '{t['name']}' dept='{t['department']}' phase='{t['time_phase']}' due={due}")
                 execute_db(
                     '''INSERT INTO tasks (clinic_id, name, department, time_phase, due_date, status,
                        order_index, template_offset_days) VALUES (?,?,?,?,?,?,?,?)''',
@@ -1040,20 +1113,83 @@ def edit_clinic(clinic_id):
         data_analysis = request.form.get('data_analysis_summary', '') or None
         clinic_notes = request.form.get('clinic_notes', '') or None
         photos_link = request.form.get('photos_videos_link', '') or None
+        # Timeline milestone fields
+        date_scouting_started = request.form.get('date_scouting_started', '') or None
+        date_lease_negotiation_started = request.form.get('date_lease_negotiation_started', '') or None
+        date_lease_signed = request.form.get('date_lease_signed', '') or None
+        target_construction_completion = request.form.get('target_construction_completion', '') or None
+        actual_construction_completion = request.form.get('actual_construction_completion', '') or None
+        actual_opening_date = request.form.get('actual_opening_date', '') or None
+        # Sync date_lease_signed ↔ lease_signed_date
+        if date_lease_signed and not lease_signed_date:
+            lease_signed_date = date_lease_signed
+        elif lease_signed_date and not date_lease_signed:
+            date_lease_signed = lease_signed_date
+
+        # Track opening date pushbacks
+        old_opening_date = clinic['opening_date']
+        pushback_count = clinic['opening_date_pushback_count'] or 0
+        if old_opening_date and opening_date and old_opening_date != opening_date:
+            pushback_count += 1
 
         execute_db(
             '''UPDATE clinics SET name=?, opening_date=?, state=?, entity=?,
                sg_project_manager=?, sg_onsite_member=?, setup_week=?, ops_onsite_member=?,
                doctor_status=?, site_status=?, targeting_opening_month=?,
                procedures_done_where=?, paired_clinic=?, total_buildout_cost=?, cost_to_vip=?,
-               data_analysis_summary=?, clinic_notes=?, photos_videos_link=?
+               data_analysis_summary=?, clinic_notes=?, photos_videos_link=?,
+               lease_signed_date=?,
+               date_scouting_started=?, date_lease_negotiation_started=?, date_lease_signed=?,
+               target_construction_completion=?, actual_construction_completion=?,
+               actual_opening_date=?, opening_date_pushback_count=?
                WHERE id=?''',
             (name, opening_date, state, entity,
              sg_pm, sg_onsite, setup_week, ops_onsite,
              doctor_status, site_status, targeting_month,
              procedures_done_where, paired_clinic, total_buildout_cost, cost_to_vip,
-             data_analysis, clinic_notes, photos_link, clinic_id)
+             data_analysis, clinic_notes, photos_link,
+             lease_signed_date,
+             date_scouting_started, date_lease_negotiation_started, date_lease_signed,
+             target_construction_completion, actual_construction_completion,
+             actual_opening_date, pushback_count,
+             clinic_id)
         )
+
+        # Recalculate task due dates when opening_date changed
+        opening_date_changed = old_opening_date != opening_date
+        old_lease_signed = clinic['date_lease_signed'] if 'date_lease_signed' in clinic.keys() else None
+        lease_signed_changed = old_lease_signed != date_lease_signed
+
+        if opening_date_changed and opening_date:
+            # Recalculate all tasks that use opening_date phases
+            opening_phases = [
+                '2 Months Before Opening', '1 Month Before Opening', '2 Weeks Before Opening',
+                '1 Week Before Opening', 'Week Before Opening', 'Opening Day',
+                '1 Week After Opening', '1 Month After Opening', '2 Months After Opening',
+                '3 Months After Opening', 'Scouting'
+            ]
+            all_tasks = query_db("SELECT * FROM tasks WHERE clinic_id=?", [clinic_id])
+            for t in all_tasks:
+                if t['time_phase'] in opening_phases:
+                    new_due = calc_phase_due_date(
+                        t['time_phase'], opening_date,
+                        date_scouting_started, date_lease_signed
+                    )
+                    execute_db("UPDATE tasks SET due_date=? WHERE id=?", (new_due, t['id']))
+            flash('Opening date updated — task due dates recalculated.', 'success')
+
+        if lease_signed_changed and date_lease_signed:
+            # Recalculate 'After Lease Signed' tasks
+            from datetime import datetime as dt2
+            try:
+                ld = dt2.strptime(date_lease_signed, '%Y-%m-%d')
+                new_due = (ld + timedelta(days=14)).strftime('%Y-%m-%d')
+                execute_db(
+                    "UPDATE tasks SET due_date=? WHERE clinic_id=? AND time_phase='After Lease Signed'",
+                    (new_due, clinic_id)
+                )
+            except Exception:
+                pass
 
         lease_file = request.files.get('lease_file')
         supply_file = request.files.get('supply_checkin_file')
@@ -1444,6 +1580,16 @@ def update_construction_task(clinic_id):
         return jsonify({'error': 'Invalid field'}), 400
     execute_db(f"UPDATE construction_tasks SET {field}=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND clinic_id=?",
                (value or None, task_id, clinic_id))
+    # After status update, check if ALL construction tasks are Complete
+    if field == 'status':
+        total = query_db("SELECT COUNT(*) as cnt FROM construction_tasks WHERE clinic_id=?", [clinic_id], one=True)['cnt']
+        done = query_db("SELECT COUNT(*) as cnt FROM construction_tasks WHERE clinic_id=? AND status='Complete'", [clinic_id], one=True)['cnt']
+        if total > 0 and done == total:
+            # Check if actual_construction_completion not already set
+            clinic = query_db("SELECT actual_construction_completion FROM clinics WHERE id=?", [clinic_id], one=True)
+            if clinic and not clinic['actual_construction_completion']:
+                today_str = datetime.now().strftime('%Y-%m-%d')
+                execute_db("UPDATE clinics SET actual_construction_completion=? WHERE id=?", (today_str, clinic_id))
     return jsonify({'ok': True})
 
 @app.route('/clinic/<int:clinic_id>/construction/add', methods=['POST'])
@@ -2566,6 +2712,96 @@ def reports_builder_csv():
     output = si.getvalue()
     return Response(output, mimetype='text/csv',
                     headers={'Content-Disposition': 'attachment;filename=custom_report.csv'})
+
+
+@app.route('/reports/timeline')
+@login_required
+def reports_timeline():
+    clinics = query_db(
+        "SELECT * FROM clinics WHERE is_template=0 AND status != 'Archived' ORDER BY name ASC"
+    )
+
+    def parse_d(s):
+        if not s:
+            return None
+        try:
+            return datetime.strptime(s, '%Y-%m-%d').date()
+        except Exception:
+            return None
+
+    deal_rows = []
+    construction_rows = []
+    opening_accuracy_rows = []
+    total_pushbacks = 0
+    scouting_to_lease_days = []
+    lease_to_opening_days = []
+    construction_variances = []
+
+    for c in clinics:
+        sd = parse_d(c['date_scouting_started'] if 'date_scouting_started' in c.keys() else None)
+        ld = parse_d(c['date_lease_signed'] if 'date_lease_signed' in c.keys() else None)
+        od = parse_d(c['opening_date'])
+        aod = parse_d(c['actual_opening_date'] if 'actual_opening_date' in c.keys() else None)
+        tcc = parse_d(c['target_construction_completion'] if 'target_construction_completion' in c.keys() else None)
+        acc = parse_d(c['actual_construction_completion'] if 'actual_construction_completion' in c.keys() else None)
+        pushbacks = c['opening_date_pushback_count'] if 'opening_date_pushback_count' in c.keys() else 0
+        pushbacks = pushbacks or 0
+        total_pushbacks += pushbacks
+
+        # Deal duration
+        scout_to_lease = (ld - sd).days if sd and ld else None
+        lease_to_open = (aod - ld).days if ld and aod else ((od - ld).days if ld and od else None)
+        total_deal = (aod - sd).days if sd and aod else ((od - sd).days if sd and od else None)
+
+        if scout_to_lease is not None:
+            scouting_to_lease_days.append(scout_to_lease)
+        if lease_to_open is not None:
+            lease_to_opening_days.append(lease_to_open)
+
+        deal_rows.append({
+            'clinic': dict(c),
+            'scout_to_lease': scout_to_lease,
+            'lease_to_open': lease_to_open,
+            'total_deal': total_deal,
+        })
+
+        # Construction accuracy
+        if tcc and acc:
+            variance = (acc - tcc).days  # positive = late, negative = early
+            construction_variances.append(variance)
+            construction_rows.append({
+                'clinic': dict(c),
+                'target': str(tcc),
+                'actual': str(acc),
+                'variance': variance,
+            })
+
+        # Opening accuracy
+        days_early_late = None
+        if aod and od:
+            days_early_late = (aod - od).days  # positive = late, negative = early
+        opening_accuracy_rows.append({
+            'clinic': dict(c),
+            'target_opening': str(od) if od else None,
+            'actual_opening': str(aod) if aod else None,
+            'pushbacks': pushbacks,
+            'days_early_late': days_early_late,
+        })
+
+    # Summary stats
+    avg_scout_to_lease = round(sum(scouting_to_lease_days) / len(scouting_to_lease_days)) if scouting_to_lease_days else None
+    avg_lease_to_open = round(sum(lease_to_opening_days) / len(lease_to_opening_days)) if lease_to_opening_days else None
+    avg_construction_variance = round(sum(construction_variances) / len(construction_variances)) if construction_variances else None
+
+    return render_template('reports_timeline.html',
+        deal_rows=deal_rows,
+        construction_rows=construction_rows,
+        opening_accuracy_rows=opening_accuracy_rows,
+        avg_scout_to_lease=avg_scout_to_lease,
+        avg_lease_to_open=avg_lease_to_open,
+        avg_construction_variance=avg_construction_variance,
+        total_pushbacks=total_pushbacks,
+    )
 
 
 # ─── Due-date notifications check ────────────────────────────────────────────

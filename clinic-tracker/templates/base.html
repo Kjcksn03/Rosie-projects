@@ -32,6 +32,7 @@
       <a href="{{ url_for('weekly_report_all') }}">📰 Weekly Report</a>
       <a href="{{ url_for('reports_leases') }}">🏢 Lease Report</a>
       <a href="{{ url_for('reports_builder') }}">🛠️ Report Builder</a>
+      <a href="{{ url_for('reports_timeline') }}">📅 Timeline Report</a>
       <a href="{{ url_for('notifications') }}">
         🔔 Alerts
         <span class="notif-badge" {% if unread_count() == 0 %}style="display:none"{% endif %}>{{ unread_count() }}</span>

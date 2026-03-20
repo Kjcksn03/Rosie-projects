@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Timeline Analytics | VIP Medical Group{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1200px;margin:2rem auto;padding:0 1rem;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+    <div>
+      <h1 style="margin:0;font-size:1.6rem;">📅 Timeline Analytics Report</h1>
+      <p style="color:#666;margin:.25rem 0 0;">Deal durations, construction accuracy, and opening date tracking across all active clinics.</p>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;">
+    <div class="card" style="padding:1rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:700;color:var(--navy);">{{ avg_scout_to_lease if avg_scout_to_lease is not none else '—' }}</div>
+      <div style="font-size:.85rem;color:#666;margin-top:.25rem;">Avg Days: Scouting → Lease Signed</div>
+    </div>
+    <div class="card" style="padding:1rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:700;color:var(--navy);">{{ avg_lease_to_open if avg_lease_to_open is not none else '—' }}</div>
+      <div style="font-size:.85rem;color:#666;margin-top:.25rem;">Avg Days: Lease Signed → Opening</div>
+    </div>
+    <div class="card" style="padding:1rem;text-align:center;">
+      {% if avg_construction_variance is not none %}
+        <div style="font-size:2rem;font-weight:700;color:{% if avg_construction_variance > 0 %}#e53e3e{% elif avg_construction_variance < 0 %}#38a169{% else %}var(--navy){% endif %};">
+          {% if avg_construction_variance > 0 %}+{% endif %}{{ avg_construction_variance }} days
+        </div>
+      {% else %}
+        <div style="font-size:2rem;font-weight:700;color:var(--navy);">—</div>
+      {% endif %}
+      <div style="font-size:.85rem;color:#666;margin-top:.25rem;">Avg Construction Variance</div>
+    </div>
+    <div class="card" style="padding:1rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:700;color:{% if total_pushbacks > 0 %}#e67e22{% else %}var(--navy){% endif %};">{{ total_pushbacks }}</div>
+      <div style="font-size:.85rem;color:#666;margin-top:.25rem;">Total Opening Date Pushbacks</div>
+    </div>
+  </div>
+
+  <!-- Deal Duration Table -->
+  <div class="card" style="margin-bottom:2rem;">
+    <div class="card-header" style="background:var(--navy);color:#fff;padding:.75rem 1rem;border-radius:8px 8px 0 0;">
+      <h2 style="margin:0;font-size:1.1rem;">📊 Deal Duration by Clinic</h2>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+        <thead>
+          <tr style="background:#f1f5f9;text-align:left;">
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Clinic</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Scouting → Lease Signed</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Lease Signed → Opening</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Total Deal Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in deal_rows %}
+          <tr style="border-bottom:1px solid #f0f4f8;">
+            <td style="padding:.65rem 1rem;font-weight:500;">
+              <a href="{{ url_for('clinic_dashboard', clinic_id=row.clinic.id) }}" style="color:var(--navy);">{{ row.clinic.name }}</a>
+            </td>
+            <td style="padding:.65rem 1rem;">
+              {% if row.scout_to_lease is not none %}{{ row.scout_to_lease }} days{% else %}<span style="color:#aaa;">—</span>{% endif %}
+            </td>
+            <td style="padding:.65rem 1rem;">
+              {% if row.lease_to_open is not none %}{{ row.lease_to_open }} days{% else %}<span style="color:#aaa;">—</span>{% endif %}
+            </td>
+            <td style="padding:.65rem 1rem;">
+              {% if row.total_deal is not none %}<strong>{{ row.total_deal }} days</strong>{% else %}<span style="color:#aaa;">—</span>{% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="padding:1rem;text-align:center;color:#888;">No timeline data available yet. Set Scouting Start and Lease Signed dates on clinics.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Construction Accuracy -->
+  <div class="card" style="margin-bottom:2rem;">
+    <div class="card-header" style="background:var(--navy);color:#fff;padding:.75rem 1rem;border-radius:8px 8px 0 0;">
+      <h2 style="margin:0;font-size:1.1rem;">🏗️ Construction Accuracy</h2>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+        <thead>
+          <tr style="background:#f1f5f9;text-align:left;">
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Clinic</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Target Completion</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Actual Completion</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Variance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in construction_rows %}
+          <tr style="border-bottom:1px solid #f0f4f8;">
+            <td style="padding:.65rem 1rem;font-weight:500;">
+              <a href="{{ url_for('clinic_construction', clinic_id=row.clinic.id) }}" style="color:var(--navy);">{{ row.clinic.name }}</a>
+            </td>
+            <td style="padding:.65rem 1rem;">{{ row.target }}</td>
+            <td style="padding:.65rem 1rem;">{{ row.actual }}</td>
+            <td style="padding:.65rem 1rem;">
+              {% if row.variance > 0 %}
+                <span style="color:#e53e3e;font-weight:600;">+{{ row.variance }} days late</span>
+              {% elif row.variance < 0 %}
+                <span style="color:#38a169;font-weight:600;">{{ row.variance|abs }} days early</span>
+              {% else %}
+                <span style="color:#666;">On target</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="padding:1rem;text-align:center;color:#888;">No construction completion data yet. Set Target and Actual Construction Completion on clinics.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Opening Date Accuracy -->
+  <div class="card" style="margin-bottom:2rem;">
+    <div class="card-header" style="background:var(--navy);color:#fff;padding:.75rem 1rem;border-radius:8px 8px 0 0;">
+      <h2 style="margin:0;font-size:1.1rem;">🎯 Opening Date Accuracy</h2>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+        <thead>
+          <tr style="background:#f1f5f9;text-align:left;">
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Clinic</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Target Opening</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Actual Opening</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;"># Pushbacks</th>
+            <th style="padding:.75rem 1rem;border-bottom:1px solid #e2e8f0;">Days Early/Late</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in opening_accuracy_rows %}
+          <tr style="border-bottom:1px solid #f0f4f8;">
+            <td style="padding:.65rem 1rem;font-weight:500;">
+              <a href="{{ url_for('clinic_dashboard', clinic_id=row.clinic.id) }}" style="color:var(--navy);">{{ row.clinic.name }}</a>
+            </td>
+            <td style="padding:.65rem 1rem;">{{ row.target_opening or '—' }}</td>
+            <td style="padding:.65rem 1rem;">{{ row.actual_opening or '—' }}</td>
+            <td style="padding:.65rem 1rem;">
+              {% if row.pushbacks > 0 %}
+                <span style="color:#e67e22;font-weight:600;">{{ row.pushbacks }}</span>
+              {% else %}
+                <span style="color:#666;">0</span>
+              {% endif %}
+            </td>
+            <td style="padding:.65rem 1rem;">
+              {% if row.days_early_late is not none %}
+                {% if row.days_early_late > 0 %}
+                  <span style="color:#e53e3e;font-weight:600;">+{{ row.days_early_late }} days late</span>
+                {% elif row.days_early_late < 0 %}
+                  <span style="color:#38a169;font-weight:600;">{{ row.days_early_late|abs }} days early</span>
+                {% else %}
+                  <span style="color:#666;">Exactly on target</span>
+                {% endif %}
+              {% else %}
+                <span style="color:#aaa;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -78,12 +78,53 @@
               <input type="text" name="setup_week" class="form-control" value="{{ clinic.setup_week or '' }}">
             </div>
             <div class="form-group">
-              <label>Opening Day / Date</label>
-              <input type="date" name="opening_date" class="form-control" value="{{ clinic.opening_date or '' }}">
-            </div>
-            <div class="form-group">
               <label>Targeting Opening Month</label>
               <input type="text" name="targeting_opening_month" class="form-control" value="{{ clinic.targeting_opening_month or '' }}">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3b: Timeline & Milestones -->
+        <div class="form-section">
+          <div class="form-section-title">3b · Timeline &amp; Milestones</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Date Scouting Started</label>
+              <input type="date" name="date_scouting_started" class="form-control" value="{{ clinic.date_scouting_started or '' }}">
+            </div>
+            <div class="form-group">
+              <label>Date Lease Negotiation Started</label>
+              <input type="date" name="date_lease_negotiation_started" class="form-control" value="{{ clinic.date_lease_negotiation_started or '' }}">
+            </div>
+            <div class="form-group">
+              <label>Date Lease Signed</label>
+              <input type="date" name="date_lease_signed" class="form-control" value="{{ clinic.date_lease_signed or clinic.lease_signed_date or '' }}">
+              <small class="text-muted">Synced with lease_signed_date</small>
+            </div>
+            <div class="form-group">
+              <label>🎯 Target Opening Date</label>
+              <input type="date" name="opening_date" class="form-control" value="{{ clinic.opening_date or '' }}">
+              <small class="text-muted">Changing this recalculates task due dates</small>
+            </div>
+            <div class="form-group">
+              <label>Target Construction Completion</label>
+              <input type="date" name="target_construction_completion" class="form-control" value="{{ clinic.target_construction_completion or '' }}">
+            </div>
+            <div class="form-group">
+              <label>Actual Construction Completion</label>
+              <input type="date" name="actual_construction_completion" class="form-control" value="{{ clinic.actual_construction_completion or '' }}">
+              <small class="text-muted">Auto-set when all construction tasks complete</small>
+            </div>
+            <div class="form-group">
+              <label>Actual Opening Date</label>
+              <input type="date" name="actual_opening_date" class="form-control" value="{{ clinic.actual_opening_date or '' }}">
+            </div>
+            <div class="form-group">
+              <label>Opening Date Pushbacks</label>
+              <div class="form-control" style="background:#f8fafc;cursor:default;">
+                {{ clinic.opening_date_pushback_count or 0 }} time(s)
+                <small style="color:#888;"> — auto-tracked</small>
+              </div>
             </div>
           </div>
         </div>
