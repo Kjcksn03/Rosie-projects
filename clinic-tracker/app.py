@@ -762,6 +762,19 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def pm_required(f):
+    """Allows admin and project_manager roles."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        user = query_db("SELECT * FROM users WHERE id=?", [session['user_id']], one=True)
+        if not user or user['role'] not in ('admin', 'project_manager'):
+            flash('Project Manager or Admin access required.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated
+
 def current_user():
     if 'user_id' in session:
         return query_db("SELECT * FROM users WHERE id=?", [session['user_id']], one=True)
@@ -795,7 +808,7 @@ def log_activity(clinic_id, task_id, user_id, action, detail=None):
     )
 
 def can_edit_task(user, task):
-    if user['role'] == 'admin':
+    if user['role'] in ('admin', 'project_manager'):
         return True
     if user['role'] == 'dept_head' and user['department'] == task['department']:
         return True
@@ -921,7 +934,7 @@ def index():
     return render_template('index.html', clinic_stats=clinic_stats)
 
 @app.route('/clinic/new', methods=['GET', 'POST'])
-@admin_required
+@pm_required
 def new_clinic():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -1001,7 +1014,7 @@ def new_clinic():
     return render_template('new_clinic.html')
 
 @app.route('/clinic/<int:clinic_id>/edit', methods=['GET', 'POST'])
-@admin_required
+@pm_required
 def edit_clinic(clinic_id):
     clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
     if not clinic:
@@ -1127,7 +1140,7 @@ def new_task(clinic_id):
     clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
     if not clinic:
         return redirect(url_for('index'))
-    if user['role'] not in ('admin', 'dept_head'):
+    if user['role'] not in ('admin', 'project_manager', 'dept_head'):
         flash('Permission denied.', 'error')
         return redirect(url_for('clinic_tasks', clinic_id=clinic_id))
     if request.method == 'POST':
@@ -1450,7 +1463,7 @@ def add_construction_task(clinic_id):
     return redirect(url_for('clinic_construction', clinic_id=clinic_id))
 
 @app.route('/clinic/<int:clinic_id>/construction/delete/<int:task_id>', methods=['POST'])
-@admin_required
+@pm_required
 def delete_construction_task(clinic_id, task_id):
     execute_db("DELETE FROM construction_tasks WHERE id=? AND clinic_id=?", (task_id, clinic_id))
     flash('Task deleted.', 'success')
@@ -1834,6 +1847,46 @@ def admin_new_user():
     )
     flash(f'User {full_name} created.', 'success')
     return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_user(user_id):
+    user = query_db("SELECT * FROM users WHERE id=?", [user_id], one=True)
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('admin_users'))
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip() or None
+        role = request.form.get('role', 'team_member')
+        department = request.form.get('department', '') or None
+        new_password = request.form.get('new_password', '').strip()
+        if not full_name or not username:
+            flash('Full name and username are required.', 'error')
+            return render_template('admin_edit_user.html', user=user, departments=DEPARTMENTS)
+        # Check username uniqueness (excluding this user)
+        existing = query_db("SELECT id FROM users WHERE username=? AND id != ?", [username, user_id], one=True)
+        if existing:
+            flash('Username already taken.', 'error')
+            return render_template('admin_edit_user.html', user=user, departments=DEPARTMENTS)
+        if new_password:
+            execute_db(
+                "UPDATE users SET full_name=?, username=?, role=?, department=?, password_hash=? WHERE id=?",
+                (full_name, username, role, department, generate_password_hash(new_password), user_id)
+            )
+        else:
+            execute_db(
+                "UPDATE users SET full_name=?, username=?, role=?, department=? WHERE id=?",
+                (full_name, username, role, department, user_id)
+            )
+        # Update session if editing self
+        if user_id == session['user_id']:
+            session['full_name'] = full_name
+            session['role'] = role
+        flash(f'User {full_name} updated successfully.', 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin_edit_user.html', user=user, departments=DEPARTMENTS)
 
 @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
 @admin_required

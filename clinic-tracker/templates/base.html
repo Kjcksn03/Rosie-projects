@@ -20,8 +20,10 @@
     </div>
     <div class="navbar-links" id="navbar-links">
       <a href="{{ url_for('index') }}">🏠 Clinics</a>
-      {% if session.role == 'admin' %}
+      {% if session.role in ('admin', 'project_manager') %}
       <a href="{{ url_for('new_clinic') }}">➕ New Clinic</a>
+      {% endif %}
+      {% if session.role == 'admin' %}
       <a href="{{ url_for('template_tasks') }}">📋 Template</a>
       <a href="{{ url_for('admin_users') }}">👥 Users</a>
       {% endif %}

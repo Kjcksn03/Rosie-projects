@@ -27,11 +27,13 @@
             <td><code>{{ u.username }}</code></td>
             <td>
               {% if u.role == 'admin' %}<span class="badge badge-gold">Admin</span>
+              {% elif u.role == 'project_manager' %}<span class="badge badge-complete">Project Manager</span>
               {% elif u.role == 'dept_head' %}<span class="badge badge-in-progress">Dept Head</span>
               {% else %}<span class="badge badge-not-started">Team Member</span>{% endif %}
             </td>
             <td>{{ u.department or '–' }}</td>
-            <td>
+            <td style="white-space:nowrap">
+              <a href="{{ url_for('admin_edit_user', user_id=u.id) }}" class="btn btn-sm" style="margin-right:4px">Edit</a>
               {% if u.id != session.user_id %}
               <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" class="confirm-delete" style="display:inline">
                 <button class="btn btn-danger btn-xs">Delete</button>
@@ -66,6 +68,7 @@
             <select name="role" class="form-control">
               <option value="team_member">Team Member</option>
               <option value="dept_head">Department Head</option>
+              <option value="project_manager">Project Manager</option>
               <option value="admin">Admin</option>
             </select>
           </div>

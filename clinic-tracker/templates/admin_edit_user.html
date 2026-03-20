@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Edit User – VIP Clinic Launch Tracker{% endblock %}
+{% block content %}
+<div class="container" style="max-width:560px;margin:40px auto">
+  <div class="page-header">
+    <div class="page-title">✏️ Edit User</div>
+    <a href="{{ url_for('admin_users') }}" class="btn">← Back to Users</a>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">{{ user.full_name }}</span></div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" name="full_name" class="form-control" value="{{ user.full_name }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Username *</label>
+          <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select name="role" class="form-control">
+            <option value="team_member" {% if user.role == 'team_member' %}selected{% endif %}>Team Member</option>
+            <option value="dept_head" {% if user.role == 'dept_head' %}selected{% endif %}>Department Head</option>
+            <option value="project_manager" {% if user.role == 'project_manager' %}selected{% endif %}>Project Manager</option>
+            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <select name="department" class="form-control">
+            <option value="">– None –</option>
+            {% for d in departments %}
+            <option value="{{ d }}" {% if user.department == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reset Password <small style="color:var(--muted)">(leave blank to keep current)</small></label>
+          <input type="password" name="new_password" class="form-control" placeholder="New password (optional)">
+        </div>
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <button type="submit" class="btn btn-gold" style="flex:1;justify-content:center">Save Changes</button>
+          <a href="{{ url_for('admin_users') }}" class="btn" style="flex:1;text-align:center">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
