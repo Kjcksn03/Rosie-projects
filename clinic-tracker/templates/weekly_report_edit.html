@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ clinic.name }} – Edit Weekly Report{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Edit Weekly Report</span>
+  </div>
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">📰 Weekly Report — {{ clinic.name }}</div>
+      <div class="page-subtitle">Week Ending: {{ week_ending }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('weekly_report_all') }}" class="btn btn-outline">📋 All Clinics Report</a>
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-outline">← Back</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:1.5rem;">
+      <form method="POST">
+        <div class="form-group">
+          <label>Week Ending</label>
+          <input type="date" name="week_ending" class="form-control" value="{{ week_ending }}" required>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status" class="form-control">
+            <option value="On Track" {% if not report or report.status == 'On Track' %}selected{% endif %}>✅ On Track</option>
+            <option value="At Risk" {% if report and report.status == 'At Risk' %}selected{% endif %}>⚠️ At Risk</option>
+            <option value="Delayed" {% if report and report.status == 'Delayed' %}selected{% endif %}>🔴 Delayed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>This Week's Highlights</label>
+          <textarea name="highlights" class="form-control" rows="4" placeholder="What was accomplished this week?">{{ report.highlights if report and report.highlights else '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Next Week's Plan</label>
+          <textarea name="next_week" class="form-control" rows="4" placeholder="What's planned for next week?">{{ report.next_week if report and report.next_week else '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Any Timeline Changes</label>
+          <textarea name="timeline_changes" class="form-control" rows="2" placeholder="Any changes to the opening timeline?">{{ report.timeline_changes if report and report.timeline_changes else '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Approvals Needed from Leadership</label>
+          <textarea name="approvals_needed" class="form-control" rows="2" placeholder="Decisions or approvals needed from leadership...">{{ report.approvals_needed if report and report.approvals_needed else '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Help Needed from Leadership</label>
+          <textarea name="help_needed" class="form-control" rows="2" placeholder="Where do you need help or support?">{{ report.help_needed if report and report.help_needed else '' }}</textarea>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <button type="submit" class="btn btn-primary">💾 Save Report</button>
+          <a href="{{ url_for('weekly_report_view', clinic_id=clinic.id, week=week_ending) }}" class="btn btn-outline">👁️ Preview</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

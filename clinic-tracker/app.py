@@ -347,6 +347,31 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (clinic_id) REFERENCES clinics(id)
         );
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+            expense_date TEXT,
+            category TEXT NOT NULL,
+            description TEXT,
+            vendor TEXT,
+            amount REAL DEFAULT 0,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS weekly_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+            week_ending TEXT NOT NULL,
+            status TEXT DEFAULT 'On Track',
+            highlights TEXT,
+            next_week TEXT,
+            timeline_changes TEXT,
+            approvals_needed TEXT,
+            help_needed TEXT,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(clinic_id, week_ending)
+        );
     ''')
     db.commit()
 
@@ -361,6 +386,7 @@ def init_db():
         ('photos_videos_link', 'TEXT'), ('lease_filename', 'TEXT'),
         ('supply_checkin_filename', 'TEXT'),
         ('lease_signed_date', 'TEXT'),
+        ('buildout_cost', 'REAL'), ('ti_allowance', 'REAL'), ('ti_paid_by_vip', 'REAL'),
     ]
     existing_cols = [row[1] for row in db.execute("PRAGMA table_info(clinics)").fetchall()]
     for col_name, col_type in new_clinic_cols:
@@ -669,6 +695,34 @@ def populate_construction_tasks(clinic_id):
             (clinic_id, name, 'Not Started', i)
         )
 
+EXPENSE_TEMPLATES = [
+    ('Exam Chairs', 'Down payment for exam chairs ($1488.70 x # of chairs)', 'Hill'),
+    ('Exam Chairs', 'Final payment for exam chairs (see invoice)', 'Hill'),
+    ('Ultrasounds', 'Ultrasound machines', 'GE'),
+    ('Food', 'Breakfast for staff on first day', ''),
+    ('Handyman', 'Taskrabbits for furniture building and mounting', 'Taskrabbit'),
+    ('Furniture', 'Furniture for office', ''),
+    ('Office Supplies', 'Office supplies', 'Amazon'),
+    ('Medical Supplies', 'Non-ablation/varithena medical supplies', 'McKesson/Carolon/Total Vein/Asclera/Amazon'),
+    ('Medical Supplies', 'Ablation materials (catheters/intros/starters)', 'Medtronic'),
+    ('Medical Supplies', 'Varithena materials (canisters/admin packs)', 'Boston Scientific'),
+    ('IT', 'IT Supplies (TVs/Sonos/Cameras/Mounts/Network Equipment/Door Lock)', 'Amazon/IT Direct'),
+    ('IT', 'IT equipment installation and set-up', 'AllMedia'),
+    ('Transportation', 'Ubers and transportation during setup', ''),
+    ('Hotel', 'Hotel where PM stayed during set up', ''),
+    ('Food', 'Food PM ate while at set up', ''),
+    ('Flights', 'Flight to location for PM', ''),
+]
+
+def populate_expense_templates(clinic_id, user_id=None):
+    """Auto-populate expense template rows for a new clinic."""
+    for (category, description, vendor) in EXPENSE_TEMPLATES:
+        execute_db(
+            '''INSERT INTO expenses (clinic_id, category, description, vendor, amount, created_by)
+               VALUES (?,?,?,?,0,?)''',
+            (clinic_id, category, description, vendor, user_id)
+        )
+
 # ─── Auth helpers ────────────────────────────────────────────────────────────
 
 def login_required(f):
@@ -919,9 +973,10 @@ def new_clinic():
                      'Not Started', t['order_index'], t['template_offset_days'])
                 )
 
-        # Auto-populate supplies and construction tasks
+        # Auto-populate supplies, construction tasks, and expense templates
         populate_supply_items(clinic_id)
         populate_construction_tasks(clinic_id)
+        populate_expense_templates(clinic_id, session['user_id'])
 
         log_activity(clinic_id, None, session['user_id'], 'Clinic Created', name)
         flash(f'Clinic "{name}" created successfully!', 'success')
@@ -1617,6 +1672,230 @@ def delete_clinic(clinic_id):
         execute_db("DELETE FROM clinics WHERE id=?", [clinic_id])
         flash(f'Clinic "{clinic["name"]}" deleted.', 'success')
     return redirect(url_for('index'))
+
+# ─── Expense Tracker ──────────────────────────────────────────────────────────
+
+@app.route('/clinic/<int:clinic_id>/expenses')
+@login_required
+def clinic_expenses(clinic_id):
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    expenses = query_db("SELECT * FROM expenses WHERE clinic_id=? ORDER BY category, id", [clinic_id])
+    if not expenses:
+        populate_expense_templates(clinic_id, session['user_id'])
+        expenses = query_db("SELECT * FROM expenses WHERE clinic_id=? ORDER BY category, id", [clinic_id])
+
+    # Group by category
+    categories = {}
+    for exp in expenses:
+        cat = exp['category']
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(dict(exp))
+
+    total_expenses = sum(e['amount'] or 0 for e in expenses)
+    return render_template('expenses.html',
+        clinic=clinic, categories=categories, expenses=expenses,
+        total_expenses=total_expenses)
+
+@app.route('/clinic/<int:clinic_id>/expenses/update', methods=['POST'])
+@login_required
+def update_expense(clinic_id):
+    expense_id = request.form.get('expense_id')
+    field = request.form.get('field')
+    value = request.form.get('value', '')
+    allowed = ['expense_date', 'description', 'vendor', 'amount', 'category']
+    if field not in allowed:
+        return jsonify({'error': 'Invalid field'}), 400
+    if field == 'amount':
+        try:
+            value = float(value) if value else 0
+        except ValueError:
+            value = 0
+    execute_db(f"UPDATE expenses SET {field}=? WHERE id=? AND clinic_id=?",
+               (value or None if field != 'amount' else value, expense_id, clinic_id))
+    return jsonify({'ok': True})
+
+@app.route('/clinic/<int:clinic_id>/expenses/add', methods=['POST'])
+@login_required
+def add_expense(clinic_id):
+    category = request.form.get('category', '').strip()
+    description = request.form.get('description', '').strip()
+    vendor = request.form.get('vendor', '').strip()
+    if not category:
+        return jsonify({'error': 'Category required'}), 400
+    new_id = execute_db(
+        '''INSERT INTO expenses (clinic_id, category, description, vendor, amount, created_by)
+           VALUES (?,?,?,?,0,?)''',
+        (clinic_id, category, description, vendor, session['user_id'])
+    )
+    return jsonify({'ok': True, 'id': new_id})
+
+@app.route('/clinic/<int:clinic_id>/expenses/delete/<int:expense_id>', methods=['POST'])
+@login_required
+def delete_expense(clinic_id, expense_id):
+    execute_db("DELETE FROM expenses WHERE id=? AND clinic_id=?", (expense_id, clinic_id))
+    return jsonify({'ok': True})
+
+@app.route('/clinic/<int:clinic_id>/expenses/summary', methods=['POST'])
+@login_required
+def update_expense_summary(clinic_id):
+    buildout_cost = request.form.get('buildout_cost', '') or None
+    ti_allowance = request.form.get('ti_allowance', '') or None
+    ti_paid_by_vip = request.form.get('ti_paid_by_vip', '') or None
+    try:
+        buildout_cost = float(buildout_cost) if buildout_cost else None
+    except ValueError:
+        buildout_cost = None
+    try:
+        ti_allowance = float(ti_allowance) if ti_allowance else None
+    except ValueError:
+        ti_allowance = None
+    try:
+        ti_paid_by_vip = float(ti_paid_by_vip) if ti_paid_by_vip else None
+    except ValueError:
+        ti_paid_by_vip = None
+    execute_db("UPDATE clinics SET buildout_cost=?, ti_allowance=?, ti_paid_by_vip=? WHERE id=?",
+               (buildout_cost, ti_allowance, ti_paid_by_vip, clinic_id))
+    flash('Summary updated.', 'success')
+    return redirect(url_for('clinic_expenses', clinic_id=clinic_id))
+
+# ─── Weekly Leadership Report ─────────────────────────────────────────────────
+
+def get_week_ending(date=None):
+    """Return the Friday of the current (or given) week as YYYY-MM-DD."""
+    if date is None:
+        date = datetime.now().date()
+    elif isinstance(date, str):
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+    # weekday(): Monday=0, Friday=4
+    days_until_friday = (4 - date.weekday()) % 7
+    friday = date + timedelta(days=days_until_friday)
+    return str(friday)
+
+@app.route('/weekly-report')
+@login_required
+def weekly_report_all():
+    week_ending = request.args.get('week', get_week_ending())
+    # Generate a list of recent Fridays for the dropdown
+    today = datetime.now().date()
+    weeks = []
+    for i in range(-4, 13):
+        d = today + timedelta(weeks=i)
+        we = get_week_ending(d)
+        if we not in weeks:
+            weeks.append(we)
+    weeks = sorted(set(weeks))
+
+    clinics = query_db("SELECT * FROM clinics WHERE is_template=0 ORDER BY opening_date ASC NULLS LAST, name ASC")
+    clinic_reports = []
+    for clinic in clinics:
+        report = query_db("SELECT * FROM weekly_reports WHERE clinic_id=? AND week_ending=?",
+                          [clinic['id'], week_ending], one=True)
+        # Compute stats
+        total = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=?", [clinic['id']], one=True)['cnt']
+        done = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND status='Complete'", [clinic['id']], one=True)['cnt']
+        pct = round((done / total * 100) if total > 0 else 0)
+
+        # Supply %
+        s_total = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=?", [clinic['id']], one=True)['cnt']
+        s_delivered = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=? AND order_status='Delivered'", [clinic['id']], one=True)['cnt']
+        supply_pct = round((s_delivered / s_total * 100) if s_total > 0 else 0)
+
+        # Construction current phase
+        current_construction = query_db(
+            "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='In Progress' ORDER BY order_index LIMIT 1",
+            [clinic['id']], one=True)
+        if not current_construction:
+            current_construction = query_db(
+                "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='Not Started' ORDER BY order_index LIMIT 1",
+                [clinic['id']], one=True)
+        construction_phase = current_construction['name'] if current_construction else 'Complete'
+
+        clinic_reports.append({
+            'clinic': dict(clinic),
+            'report': dict(report) if report else None,
+            'pct': pct,
+            'supply_pct': supply_pct,
+            'construction_phase': construction_phase,
+        })
+    return render_template('weekly_report_all.html',
+        clinic_reports=clinic_reports,
+        week_ending=week_ending,
+        weeks=weeks)
+
+@app.route('/clinic/<int:clinic_id>/weekly-report')
+@login_required
+def weekly_report_view(clinic_id):
+    week_ending = request.args.get('week', get_week_ending())
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+    report = query_db("SELECT * FROM weekly_reports WHERE clinic_id=? AND week_ending=?",
+                      [clinic_id, week_ending], one=True)
+    total = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=?", [clinic_id], one=True)['cnt']
+    done = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND status='Complete'", [clinic_id], one=True)['cnt']
+    pct = round((done / total * 100) if total > 0 else 0)
+    s_total = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=?", [clinic_id], one=True)['cnt']
+    s_delivered = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=? AND order_status='Delivered'", [clinic_id], one=True)['cnt']
+    supply_pct = round((s_delivered / s_total * 100) if s_total > 0 else 0)
+    current_construction = query_db(
+        "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='In Progress' ORDER BY order_index LIMIT 1",
+        [clinic_id], one=True)
+    if not current_construction:
+        current_construction = query_db(
+            "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='Not Started' ORDER BY order_index LIMIT 1",
+            [clinic_id], one=True)
+    construction_phase = current_construction['name'] if current_construction else 'Complete'
+    return render_template('weekly_report_view.html',
+        clinic=clinic, report=report, pct=pct,
+        supply_pct=supply_pct, construction_phase=construction_phase,
+        week_ending=week_ending)
+
+@app.route('/clinic/<int:clinic_id>/weekly-report/edit', methods=['GET', 'POST'])
+@login_required
+def weekly_report_edit(clinic_id):
+    week_ending = request.args.get('week', get_week_ending())
+    clinic = query_db("SELECT * FROM clinics WHERE id=?", [clinic_id], one=True)
+    if not clinic:
+        flash('Clinic not found.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        week_ending = request.form.get('week_ending', week_ending)
+        status = request.form.get('status', 'On Track')
+        highlights = request.form.get('highlights', '') or None
+        next_week = request.form.get('next_week', '') or None
+        timeline_changes = request.form.get('timeline_changes', '') or None
+        approvals_needed = request.form.get('approvals_needed', '') or None
+        help_needed = request.form.get('help_needed', '') or None
+
+        existing = query_db("SELECT id FROM weekly_reports WHERE clinic_id=? AND week_ending=?",
+                            [clinic_id, week_ending], one=True)
+        if existing:
+            execute_db(
+                '''UPDATE weekly_reports SET status=?, highlights=?, next_week=?,
+                   timeline_changes=?, approvals_needed=?, help_needed=? WHERE id=?''',
+                (status, highlights, next_week, timeline_changes, approvals_needed, help_needed, existing['id'])
+            )
+        else:
+            execute_db(
+                '''INSERT INTO weekly_reports (clinic_id, week_ending, status, highlights, next_week,
+                   timeline_changes, approvals_needed, help_needed, created_by)
+                   VALUES (?,?,?,?,?,?,?,?,?)''',
+                (clinic_id, week_ending, status, highlights, next_week,
+                 timeline_changes, approvals_needed, help_needed, session['user_id'])
+            )
+        flash('Weekly report saved.', 'success')
+        return redirect(url_for('weekly_report_view', clinic_id=clinic_id, week=week_ending))
+
+    report = query_db("SELECT * FROM weekly_reports WHERE clinic_id=? AND week_ending=?",
+                      [clinic_id, week_ending], one=True)
+    return render_template('weekly_report_edit.html',
+        clinic=clinic, report=report, week_ending=week_ending)
 
 # ─── Due-date notifications check ────────────────────────────────────────────
 

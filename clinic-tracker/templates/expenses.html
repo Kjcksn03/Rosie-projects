@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}{{ clinic.name }} – Expenses{% endblock %}
+{% block head %}
+<style>
+.expense-table { width:100%; border-collapse:collapse; font-size:.88rem; }
+.expense-table th { background:var(--navy,#1a2a4a); color:#fff; padding:8px 10px; text-align:left; }
+.expense-table td { padding:7px 10px; border-bottom:1px solid #e8e8e8; vertical-align:middle; }
+.expense-table tr:hover td { background:#f8f9fb; }
+.category-header td { background:#f0f3f8; font-weight:700; color:var(--navy,#1a2a4a); font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; }
+.editable-cell { cursor:pointer; min-width:80px; }
+.editable-cell:hover { background:#fffde7; border-radius:3px; }
+.editable-cell input { width:100%; border:1px solid var(--gold,#c8a951); border-radius:3px; padding:3px 5px; font-size:.88rem; background:#fffde7; }
+.amount-cell { text-align:right; }
+.summary-box { background:var(--navy,#1a2a4a); color:#fff; border-radius:10px; padding:1.5rem 2rem; margin-top:1.5rem; }
+.summary-row { display:flex; justify-content:space-between; align-items:center; padding:.4rem 0; border-bottom:1px solid rgba(255,255,255,.1); font-size:.95rem; }
+.summary-row:last-child { border-bottom:none; }
+.summary-row.total { font-size:1.15rem; font-weight:700; color:var(--gold,#c8a951); padding-top:.8rem; }
+.summary-row input { background:rgba(255,255,255,.1); border:1px solid var(--gold,#c8a951); color:#fff; border-radius:4px; padding:4px 8px; width:140px; text-align:right; }
+.btn-delete-exp { background:none; border:none; color:#cc3333; cursor:pointer; font-size:1rem; padding:2px 6px; }
+.btn-delete-exp:hover { background:#fff0f0; border-radius:3px; }
+@media print {
+  .navbar, .breadcrumb, .btn, .flash-container, .no-print { display:none !important; }
+  .summary-box { color:#000; background:#f5f5f5; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Expenses</span>
+  </div>
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">💰 Expense Tracker</div>
+      <div class="page-subtitle">{{ clinic.name }}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap no-print">
+      <button class="btn btn-gold" onclick="addExpenseRow()">➕ Add Expense</button>
+      <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+      <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}" class="btn btn-outline">← Back</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="expense-table" id="expenseTable">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th>Date</th>
+          <th style="text-align:right">Amount</th>
+          <th class="no-print"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for category, items in categories.items() %}
+        <tr class="category-header">
+          <td colspan="6">{{ category }}</td>
+        </tr>
+        {% for exp in items %}
+        <tr id="exp-row-{{ exp.id }}">
+          <td class="editable-cell" data-id="{{ exp.id }}" data-field="category" onclick="makeEditable(this)">{{ exp.category or '' }}</td>
+          <td class="editable-cell" data-id="{{ exp.id }}" data-field="description" onclick="makeEditable(this)">{{ exp.description or '' }}</td>
+          <td class="editable-cell" data-id="{{ exp.id }}" data-field="vendor" onclick="makeEditable(this)">{{ exp.vendor or '' }}</td>
+          <td class="editable-cell" data-id="{{ exp.id }}" data-field="expense_date" onclick="makeEditable(this)">{{ exp.expense_date or '' }}</td>
+          <td class="editable-cell amount-cell" data-id="{{ exp.id }}" data-field="amount" onclick="makeEditable(this)">{{ '${:,.2f}'.format(exp.amount or 0) }}</td>
+          <td class="no-print"><button class="btn-delete-exp" onclick="deleteExpense({{ exp.id }})">🗑️</button></td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Summary Section -->
+  <div class="summary-box">
+    <h3 style="margin:0 0 1rem;color:var(--gold,#c8a951);font-size:1.1rem;">📊 Financial Summary</h3>
+    <div class="summary-row">
+      <span>Total Expenses</span>
+      <span id="totalExpenses">${{ '{:,.2f}'.format(total_expenses) }}</span>
+    </div>
+    <form method="POST" action="{{ url_for('update_expense_summary', clinic_id=clinic.id) }}">
+      <div class="summary-row">
+        <span>Build Out Cost</span>
+        <input type="number" name="buildout_cost" step="0.01" placeholder="0.00"
+               value="{{ clinic.buildout_cost or '' }}" id="buildoutCost"
+               onchange="recalcNet()">
+      </div>
+      <div class="summary-row">
+        <span>TI Allowance</span>
+        <input type="number" name="ti_allowance" step="0.01" placeholder="0.00"
+               value="{{ clinic.ti_allowance or '' }}" id="tiAllowance"
+               onchange="recalcNet()">
+      </div>
+      <div class="summary-row">
+        <span>Total TI Paid by VIP</span>
+        <input type="number" name="ti_paid_by_vip" step="0.01" placeholder="0.00"
+               value="{{ clinic.ti_paid_by_vip or '' }}" id="tiPaidByVip">
+      </div>
+      <div class="summary-row total">
+        <span>Net Cost to VIP</span>
+        <span id="netCost">—</span>
+      </div>
+      <div style="margin-top:1rem;" class="no-print">
+        <button type="submit" class="btn btn-gold">💾 Save Summary</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Expense Modal -->
+<div id="addExpenseModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:2rem;width:460px;max-width:95%;">
+    <h3 style="margin:0 0 1rem;color:var(--navy)">Add Expense</h3>
+    <div class="form-group">
+      <label>Category *</label>
+      <input type="text" id="newCategory" class="form-control" list="catList" placeholder="e.g. Medical Supplies">
+      <datalist id="catList">
+        {% for cat in categories.keys() %}
+        <option value="{{ cat }}">
+        {% endfor %}
+        <option value="Exam Chairs"><option value="Ultrasounds"><option value="Food">
+        <option value="Handyman"><option value="Furniture"><option value="Office Supplies">
+        <option value="Medical Supplies"><option value="IT"><option value="Transportation">
+        <option value="Hotel"><option value="Flights"><option value="Other">
+      </datalist>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input type="text" id="newDescription" class="form-control" placeholder="Description">
+    </div>
+    <div class="form-group">
+      <label>Vendor</label>
+      <input type="text" id="newVendor" class="form-control" placeholder="Vendor name">
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1rem;">
+      <button class="btn btn-primary" onclick="submitAddExpense()">Add</button>
+      <button class="btn btn-outline" onclick="document.getElementById('addExpenseModal').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const clinicId = {{ clinic.id }};
+
+function makeEditable(cell) {
+  if (cell.querySelector('input')) return;
+  const currentVal = cell.dataset.field === 'amount'
+    ? cell.textContent.replace(/[$,]/g,'').trim()
+    : cell.textContent.trim();
+  const input = document.createElement('input');
+  input.value = currentVal;
+  if (cell.dataset.field === 'expense_date') input.type = 'date';
+  else if (cell.dataset.field === 'amount') { input.type = 'number'; input.step = '0.01'; }
+  cell.textContent = '';
+  cell.appendChild(input);
+  input.focus();
+  input.addEventListener('blur', () => saveCell(cell, input));
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+}
+
+function saveCell(cell, input) {
+  const id = cell.dataset.id;
+  const field = cell.dataset.field;
+  const value = input.value;
+  fetch(`/clinic/${clinicId}/expenses/update`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `expense_id=${id}&field=${field}&value=${encodeURIComponent(value)}`
+  }).then(r => r.json()).then(data => {
+    if (field === 'amount') {
+      const num = parseFloat(value) || 0;
+      cell.textContent = '$' + num.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      updateTotalExpenses();
+    } else {
+      cell.textContent = value;
+    }
+    if (field === 'category') location.reload();
+  });
+}
+
+function deleteExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  fetch(`/clinic/${clinicId}/expenses/delete/${id}`, {method:'POST'})
+    .then(r => r.json()).then(() => {
+      document.getElementById('exp-row-' + id).remove();
+      updateTotalExpenses();
+    });
+}
+
+function addExpenseRow() {
+  document.getElementById('addExpenseModal').style.display = 'flex';
+  document.getElementById('newCategory').focus();
+}
+
+function submitAddExpense() {
+  const category = document.getElementById('newCategory').value.trim();
+  if (!category) { alert('Category is required'); return; }
+  const description = document.getElementById('newDescription').value.trim();
+  const vendor = document.getElementById('newVendor').value.trim();
+  fetch(`/clinic/${clinicId}/expenses/add`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `category=${encodeURIComponent(category)}&description=${encodeURIComponent(description)}&vendor=${encodeURIComponent(vendor)}`
+  }).then(r => r.json()).then(() => location.reload());
+}
+
+function updateTotalExpenses() {
+  let total = 0;
+  document.querySelectorAll('[data-field="amount"]').forEach(cell => {
+    const val = parseFloat(cell.textContent.replace(/[$,]/g,'')) || 0;
+    total += val;
+  });
+  document.getElementById('totalExpenses').textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits:2});
+  recalcNet();
+}
+
+function recalcNet() {
+  const total = parseFloat(document.getElementById('totalExpenses').textContent.replace(/[$,]/g,'')) || 0;
+  const buildout = parseFloat(document.getElementById('buildoutCost').value) || 0;
+  const ti = parseFloat(document.getElementById('tiAllowance').value) || 0;
+  const net = total + buildout - ti;
+  document.getElementById('netCost').textContent = '$' + net.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+// Init net cost on load
+document.addEventListener('DOMContentLoaded', recalcNet);
+</script>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ clinic.name }} – Weekly Report{% endblock %}
+{% block head %}
+<style>
+.report-card { background:#fff; border-radius:10px; border:1px solid #e0e0e0; padding:1.5rem; margin-bottom:1rem; }
+.status-badge { display:inline-block; padding:4px 14px; border-radius:20px; font-weight:700; font-size:.85rem; }
+.status-on-track { background:#d4edda; color:#155724; }
+.status-at-risk { background:#fff3cd; color:#856404; }
+.status-delayed { background:#f8d7da; color:#721c24; }
+.report-field { margin-bottom:1rem; }
+.report-field label { font-weight:600; color:var(--navy,#1a2a4a); font-size:.82rem; text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:.3rem; }
+.report-field .value { color:#333; line-height:1.6; white-space:pre-wrap; }
+.report-meta { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; font-size:.85rem; color:#666; margin-bottom:1rem; }
+.progress-mini { height:8px; background:#e0e6ef; border-radius:4px; overflow:hidden; width:100px; display:inline-block; vertical-align:middle; }
+.progress-mini-fill { height:100%; background:var(--gold,#c8a951); border-radius:4px; }
+@media print {
+  .navbar, .breadcrumb, .no-print, .flash-container { display:none !important; }
+  body { background:#fff; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="breadcrumb no-print">
+    <a href="{{ url_for('index') }}">Clinics</a>
+    <span class="breadcrumb-sep">›</span>
+    <a href="{{ url_for('clinic_dashboard', clinic_id=clinic.id) }}">{{ clinic.name }}</a>
+    <span class="breadcrumb-sep">›</span>
+    <span>Weekly Report</span>
+  </div>
+
+  <div class="page-header no-print">
+    <div>
+      <div class="page-title">📰 Weekly Report — {{ clinic.name }}</div>
+      <div class="page-subtitle">Week Ending: {{ week_ending }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('weekly_report_edit', clinic_id=clinic.id, week=week_ending) }}" class="btn btn-gold">✏️ Edit</a>
+      <button class="btn btn-outline" onclick="window.print()">🖨️ Print</button>
+      <a href="{{ url_for('weekly_report_all') }}" class="btn btn-outline">📋 All Clinics</a>
+    </div>
+  </div>
+
+  <div class="report-card">
+    <div class="report-meta">
+      {% if clinic.state %}<span>📍 {{ clinic.state }}</span>{% endif %}
+      {% if clinic.opening_date %}<span>🗓️ Opening: {{ clinic.opening_date }}</span>{% endif %}
+      <span>✅ Progress: {{ pct }}%
+        <span class="progress-mini"><span class="progress-mini-fill" style="width:{{ pct }}%"></span></span>
+      </span>
+      <span>📦 Supplies: {{ supply_pct }}%</span>
+      <span>🏗️ Construction: {{ construction_phase }}</span>
+    </div>
+
+    <div class="report-field">
+      <label>Status</label>
+      {% if report %}
+      <span class="status-badge status-{{ report.status|lower|replace(' ','-') }}">
+        {% if report.status == 'On Track' %}✅{% elif report.status == 'At Risk' %}⚠️{% else %}🔴{% endif %}
+        {{ report.status }}
+      </span>
+      {% else %}
+      <span class="status-badge status-on-track">✅ On Track</span>
+      {% endif %}
+    </div>
+
+    {% if report %}
+    {% if report.highlights %}
+    <div class="report-field">
+      <label>This Week's Highlights</label>
+      <div class="value">{{ report.highlights }}</div>
+    </div>
+    {% endif %}
+    {% if report.next_week %}
+    <div class="report-field">
+      <label>Next Week's Plan</label>
+      <div class="value">{{ report.next_week }}</div>
+    </div>
+    {% endif %}
+    {% if report.timeline_changes %}
+    <div class="report-field">
+      <label>Timeline Changes</label>
+      <div class="value">{{ report.timeline_changes }}</div>
+    </div>
+    {% endif %}
+    {% if report.approvals_needed %}
+    <div class="report-field">
+      <label>Approvals Needed from Leadership</label>
+      <div class="value">{{ report.approvals_needed }}</div>
+    </div>
+    {% endif %}
+    {% if report.help_needed %}
+    <div class="report-field">
+      <label>Help Needed from Leadership</label>
+      <div class="value">{{ report.help_needed }}</div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state" style="padding:2rem;text-align:center;color:#888;">
+      No report submitted for this week yet.<br>
+      <a href="{{ url_for('weekly_report_edit', clinic_id=clinic.id, week=week_ending) }}" class="btn btn-gold mt-2" style="margin-top:1rem">✏️ Create Report</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
