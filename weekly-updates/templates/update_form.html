@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if update else 'Submit' }} Update – VIP Weekly Updates{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ 'Edit' if update else 'Submit' }} Weekly Update</h1>
+</div>
+
+<div class="card form-card">
+  <form method="post">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="clinic_id">Clinic</label>
+        {% if update %}
+          <input type="text" value="{{ selected_clinic.name }}" disabled>
+          <input type="hidden" name="clinic_id" value="{{ selected_clinic.id }}">
+        {% else %}
+          <select name="clinic_id" id="clinic_id" required>
+            <option value="">-- Select Clinic --</option>
+            {% for c in clinics %}
+            <option value="{{ c.id }}" {% if selected_clinic and c.id == selected_clinic.id %}selected{% endif %}>
+              {{ c.name }}{% if c.state %} ({{ c.state }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label for="week_ending">Week Ending (Friday)</label>
+        <input type="date" id="week_ending" name="week_ending"
+               value="{{ update.week_ending if update else week }}"
+               {% if update %}readonly{% endif %} required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="status">Overall Status</label>
+      <div class="status-buttons">
+        {% for s in ['On Track', 'At Risk', 'Delayed'] %}
+        <label class="status-option status-{{ s | lower | replace(' ', '-') }}">
+          <input type="radio" name="status" value="{{ s }}"
+                 {% if (update and update.status == s) or (not update and loop.first) %}checked{% endif %} required>
+          {{ s }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="completed_this_week">What was completed this week?</label>
+      <textarea id="completed_this_week" name="completed_this_week" rows="4"
+                placeholder="Key accomplishments, milestones reached...">{{ update.completed_this_week if update else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="next_week">What's happening next week?</label>
+      <textarea id="next_week" name="next_week" rows="4"
+                placeholder="Planned activities, upcoming milestones...">{{ update.next_week if update else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="blockers">Blockers or Issues</label>
+      <textarea id="blockers" name="blockers" rows="3"
+                placeholder="Any obstacles or concerns...">{{ update.blockers if update else '' }}</textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="approvals_needed">Approvals Needed from Kelly</label>
+        <textarea id="approvals_needed" name="approvals_needed" rows="3"
+                  placeholder="Items requiring Kelly's approval...">{{ update.approvals_needed if update else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="help_needed">Help Needed from Kelly</label>
+        <textarea id="help_needed" name="help_needed" rows="3"
+                  placeholder="How Kelly can assist...">{{ update.help_needed if update else '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-outline">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        {{ 'Save Changes' if update else 'Submit Update' }}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

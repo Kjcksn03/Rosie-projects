@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – VIP Weekly Updates{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Welcome, {{ user.full_name }}</h1>
+  <span class="week-badge">Week Ending: {{ week }}</span>
+</div>
+
+{% if missing %}
+<div class="banner banner-warning">
+  <strong>⚠ Reminder:</strong> You have {{ missing|length }} clinic(s) with no update submitted this week:
+  {% for c in missing %}
+    <a href="{{ url_for('new_update', clinic_id=c.id, week=week) }}">{{ c.name }}</a>{% if not loop.last %}, {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- My Clinics -->
+<section class="card mb-4">
+  <div class="card-header-row">
+    <h2 class="card-title">My Clinics – This Week</h2>
+    <a href="{{ url_for('bulk_update') }}" class="btn btn-primary">+ Submit All Updates</a>
+  </div>
+  {% if my_clinics %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Clinic</th>
+        <th>State</th>
+        <th>Opening Date</th>
+        <th>This Week's Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for clinic in my_clinics %}
+      <tr>
+        <td><strong>{{ clinic.name }}</strong></td>
+        <td>{{ clinic.state or '–' }}</td>
+        <td>{{ clinic.opening_date or '–' }}</td>
+        <td>
+          {% if clinic.week_status %}
+            <span class="badge badge-{{ clinic.week_status | lower | replace(' ', '-') }}">{{ clinic.week_status }}</span>
+          {% else %}
+            <span class="badge badge-none">Not Submitted</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if clinic.update_id %}
+            <a href="{{ url_for('edit_update', update_id=clinic.update_id) }}" class="btn-sm">Edit</a>
+          {% else %}
+            <a href="{{ url_for('new_update', clinic_id=clinic.id, week=week) }}" class="btn-sm btn-primary-sm">Submit</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">No clinics assigned to you yet.</p>
+  {% endif %}
+</section>
+
+<!-- Update History -->
+<section class="card">
+  <h2 class="card-title">Recent Update History</h2>
+  {% if recent_updates %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Clinic</th>
+        <th>Week Ending</th>
+        <th>Status</th>
+        <th>Submitted</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in recent_updates %}
+      <tr>
+        <td>{{ u.clinic_name }}</td>
+        <td>{{ u.week_ending }}</td>
+        <td><span class="badge badge-{{ u.status | lower | replace(' ', '-') }}">{{ u.status }}</span></td>
+        <td>{{ u.submitted_at[:16] }}</td>
+        <td><a href="{{ url_for('edit_update', update_id=u.id) }}" class="btn-sm">View/Edit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">No updates submitted yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

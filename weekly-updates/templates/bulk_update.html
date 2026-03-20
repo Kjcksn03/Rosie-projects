@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Submit Weekly Updates{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;">
+  <h2 style="color:var(--navy);margin-bottom:4px;">Weekly Updates</h2>
+  <p style="color:#666;margin-bottom:24px;">Fill in updates for all your clinics below and submit once.</p>
+
+  <form method="POST">
+    <input type="hidden" name="week_ending" value="{{ week }}">
+
+    {% for clinic in clinics %}
+    {% set ex = existing.get(clinic.id, {}) %}
+    <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:24px;margin-bottom:24px;box-shadow:0 2px 6px rgba(0,0,0,0.06);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;color:var(--navy);">{{ clinic.name }}</h3>
+        <span style="font-size:13px;color:#888;">{{ clinic.state }} · Opening: {{ clinic.opening_date or 'TBD' }}</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <label style="font-weight:600;font-size:13px;">Overall Status *</label>
+          <select name="status_{{ clinic.id }}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;">
+            <option value="">-- Select --</option>
+            {% for s in ['On Track','At Risk','Delayed'] %}
+            <option value="{{ s }}" {% if ex.get('status') == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Timeline Changes</label>
+          <input type="text" name="timeline_{{ clinic.id }}" value="{{ ex.get('timeline_changes','') }}"
+            placeholder="Any changes to opening date or schedule?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Completed This Week</label>
+          <textarea name="completed_{{ clinic.id }}" rows="3"
+            placeholder="What was accomplished this week?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">{{ ex.get('completed_this_week','') }}</textarea>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Next Week</label>
+          <textarea name="next_week_{{ clinic.id }}" rows="3"
+            placeholder="What's planned for next week?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">{{ ex.get('next_week','') }}</textarea>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Blockers / Issues</label>
+          <textarea name="blockers_{{ clinic.id }}" rows="2"
+            placeholder="Any blockers or issues?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">{{ ex.get('blockers','') }}</textarea>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Cost / Budget Changes</label>
+          <textarea name="cost_{{ clinic.id }}" rows="2"
+            placeholder="Any changes to cost or budget estimates?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">{{ ex.get('cost_changes','') }}</textarea>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Approvals Needed from Kelly</label>
+          <textarea name="approvals_{{ clinic.id }}" rows="2"
+            placeholder="Do you need any approvals?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">{{ ex.get('approvals_needed','') }}</textarea>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:13px;">Help Needed from Kelly</label>
+          <textarea name="help_{{ clinic.id }}" rows="2"
+            placeholder="Do you need any help from Kelly?"
+            style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px;box-sizing:border-box;">{{ ex.get('help_needed','') }}</textarea>
+        </div>
+      </div>
+      {% if ex %}
+      <p style="font-size:12px;color:var(--gold);margin-top:12px;margin-bottom:0;">✓ Already submitted for this week — resubmitting will update your response.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div style="text-align:center;margin-top:8px;margin-bottom:40px;">
+      <button type="submit" style="background:var(--gold);color:var(--navy);border:none;padding:14px 48px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;">
+        Submit All Updates ✓
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

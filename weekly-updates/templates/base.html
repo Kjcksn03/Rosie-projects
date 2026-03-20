@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}VIP Weekly Updates{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% if session.user_id %}
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="header-logo">✦</span>
+        <div>
+          <div class="header-title">VIP Medical Group</div>
+          <div class="header-subtitle">Weekly Clinic Updates</div>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        {% if session.is_admin %}
+        <a href="{{ url_for('admin_clinics') }}">Clinics</a>
+        <a href="{{ url_for('admin_users') }}">Users</a>
+        <a href="{{ url_for('admin_report') }}">Reports</a>
+        {% endif %}
+        <a href="{{ url_for('new_update') }}">Submit Update</a>
+        <a href="{{ url_for('profile') }}">{{ session.full_name }}</a>
+        <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2024 VIP Medical Group · Weekly Update System</p>
+  </footer>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
