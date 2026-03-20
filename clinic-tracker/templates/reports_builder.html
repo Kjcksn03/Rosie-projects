@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Custom Report Builder | VIP Medical Group{% endblock %}
+{% block head %}
+<style>
+.builder-layout { display:grid; grid-template-columns:320px 1fr; gap:1.5rem; align-items:start; }
+.panel { background:#fff; border-radius:10px; box-shadow:0 1px 8px rgba(0,0,0,.08); overflow:hidden; }
+.panel-header { background:var(--navy,#1a3a5c); color:#fff; padding:.8rem 1.2rem; font-weight:700; font-size:.95rem; }
+.panel-body { padding:1rem 1.2rem; }
+.field-group-title { font-size:.75rem; font-weight:700; text-transform:uppercase; color:var(--navy,#1a3a5c); margin:.9rem 0 .3rem; letter-spacing:.05em; }
+.field-group-title:first-child { margin-top:0; }
+.field-check { display:flex; align-items:center; gap:.5rem; padding:.22rem 0; cursor:pointer; font-size:.88rem; }
+.field-check input[type=checkbox] { width:15px; height:15px; cursor:pointer; accent-color:var(--navy,#1a3a5c); }
+.field-check:hover { color:var(--navy,#1a3a5c); }
+
+/* Selected fields panel */
+#selected-list { min-height:80px; padding:.5rem; list-style:none; margin:0; }
+#selected-list li { display:flex; align-items:center; justify-content:space-between; background:#f0f4f8; border:1px solid #dde3ea; border-radius:6px; padding:.4rem .7rem; margin-bottom:.35rem; font-size:.88rem; cursor:grab; user-select:none; }
+#selected-list li:active { cursor:grabbing; opacity:.7; }
+#selected-list li.drag-over { border:2px dashed var(--navy,#1a3a5c); background:#e8eef5; }
+#selected-list li .remove-field { background:none; border:none; color:#999; font-size:.95rem; cursor:pointer; padding:0 .2rem; line-height:1; }
+#selected-list li .remove-field:hover { color:#c0392b; }
+#selected-list li .drag-handle { color:#aaa; margin-right:.4rem; font-size:.9rem; }
+
+.empty-msg { color:#aaa; font-size:.85rem; font-style:italic; text-align:center; padding:.75rem 0; }
+
+/* Report table */
+.report-table { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:1rem; }
+.report-table th { background:var(--navy,#1a3a5c); color:#fff; padding:.55rem .75rem; text-align:left; white-space:nowrap; }
+.report-table td { padding:.45rem .75rem; border-bottom:1px solid #e8ecf0; }
+.report-table tr:nth-child(even) td { background:#fafbfc; }
+.report-table tr:hover td { background:#f0f4f8; }
+.table-wrap { overflow-x:auto; border-radius:8px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+
+.action-bar { display:flex; gap:.75rem; flex-wrap:wrap; margin-top:1rem; }
+
+@media(max-width:768px) {
+  .builder-layout { grid-template-columns:1fr; }
+}
+@media print {
+  .navbar, .flash-container, .no-print, .panel:first-child { display:none !important; }
+  .builder-layout { display:block; }
+  .report-table th { background:#1a3a5c !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1400px;margin:2rem auto;padding:0 1rem;">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;" class="no-print">
+    <div>
+      <h2 style="margin:0;color:var(--navy);">🛠️ Custom Report Builder</h2>
+      <p style="margin:.2rem 0 0;color:#555;">Select and arrange fields to build a custom report for all active clinics.</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Back</a>
+  </div>
+
+  <div class="builder-layout no-print">
+    <!-- Left: Available Fields -->
+    <div class="panel">
+      <div class="panel-header">📋 Available Fields</div>
+      <div class="panel-body" style="max-height:70vh;overflow-y:auto;">
+        {% for group_name, fields in field_groups %}
+        <div class="field-group-title">{{ group_name }}</div>
+        {% for key, label in fields %}
+        <label class="field-check">
+          <input type="checkbox" class="field-checkbox" data-key="{{ key }}" data-label="{{ label }}"
+            {% if key in selected_fields %}checked{% endif %}>
+          {{ label }}
+        </label>
+        {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Right: Selected Fields + Controls -->
+    <div>
+      <div class="panel" style="margin-bottom:1rem;">
+        <div class="panel-header">✅ Selected Fields <span style="font-weight:400;font-size:.82rem;opacity:.8;">(drag to reorder)</span></div>
+        <div class="panel-body">
+          <ul id="selected-list">
+            {% for key in selected_fields %}
+              {% set label = namespace(val='') %}
+              {% for group_name, fields in field_groups %}
+                {% for fkey, flabel in fields %}
+                  {% if fkey == key %}{% set label.val = flabel %}{% endif %}
+                {% endfor %}
+              {% endfor %}
+              <li data-key="{{ key }}">
+                <span><span class="drag-handle">⠿</span>{{ label.val or key }}</span>
+                <button class="remove-field" title="Remove">✕</button>
+              </li>
+            {% else %}
+            <li class="empty-msg" id="empty-msg">No fields selected. Check boxes on the left.</li>
+            {% endfor %}
+          </ul>
+          <div class="action-bar">
+            <button id="btn-generate" class="btn btn-primary btn-sm">📊 Generate Report</button>
+            <button id="btn-csv" class="btn btn-secondary btn-sm">⬇️ Export CSV</button>
+            <button id="btn-clear" class="btn btn-secondary btn-sm" style="color:#c0392b;">🗑️ Clear All</button>
+            {% if selected_fields %}
+            <button onclick="window.print()" class="btn btn-secondary btn-sm">🖨️ Print</button>
+            {% endif %}
+          </div>
+          {% if selected_fields %}
+          <p style="font-size:.78rem;color:#888;margin:.5rem 0 0;">
+            💡 Bookmark this URL to save your report configuration.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if selected_fields and report_rows %}
+  <div class="panel" style="margin-top:1rem;">
+    <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>📄 Report Results — {{ report_rows|length }} clinic(s)</span>
+      <button onclick="window.print()" class="btn btn-secondary btn-sm no-print" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.4);color:#fff;font-size:.78rem;">🖨️ Print</button>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <div class="table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              {% for key in selected_fields %}
+              {% set label = namespace(val='') %}
+              {% for group_name, fields in field_groups %}
+                {% for fkey, flabel in fields %}
+                  {% if fkey == key %}{% set label.val = flabel %}{% endif %}
+                {% endfor %}
+              {% endfor %}
+              <th>{{ label.val or key }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in report_rows %}
+            <tr>
+              {% for key in selected_fields %}
+              <td>{{ row.get(key, '') }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% elif selected_fields and not report_rows %}
+  <div class="card" style="padding:1.5rem;text-align:center;color:#888;">
+    No active clinic data found.
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+// State
+var selectedFields = {{ selected_fields | tojson }};
+var fieldLabels = {};
+{% for group_name, fields in field_groups %}
+  {% for key, label in fields %}
+  fieldLabels['{{ key }}'] = '{{ label }}';
+  {% endfor %}
+{% endfor %}
+
+// Render selected list
+function renderSelected() {
+  var list = document.getElementById('selected-list');
+  list.innerHTML = '';
+  if (selectedFields.length === 0) {
+    list.innerHTML = '<li class="empty-msg">No fields selected. Check boxes on the left.</li>';
+    return;
+  }
+  selectedFields.forEach(function(key) {
+    var li = document.createElement('li');
+    li.dataset.key = key;
+    li.draggable = true;
+    li.innerHTML = '<span><span class="drag-handle">⠿</span>' + (fieldLabels[key] || key) + '</span>'
+      + '<button class="remove-field" title="Remove">✕</button>';
+    li.querySelector('.remove-field').addEventListener('click', function() {
+      removeField(key);
+    });
+    addDragEvents(li);
+    list.appendChild(li);
+  });
+}
+
+function removeField(key) {
+  selectedFields = selectedFields.filter(function(f){ return f !== key; });
+  // Uncheck checkbox
+  document.querySelectorAll('.field-checkbox').forEach(function(cb) {
+    if (cb.dataset.key === key) cb.checked = false;
+  });
+  renderSelected();
+}
+
+// Checkbox listeners
+document.querySelectorAll('.field-checkbox').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    var key = this.dataset.key;
+    if (this.checked) {
+      if (!selectedFields.includes(key)) selectedFields.push(key);
+    } else {
+      selectedFields = selectedFields.filter(function(f){ return f !== key; });
+    }
+    renderSelected();
+  });
+});
+
+// Clear all
+document.getElementById('btn-clear').addEventListener('click', function() {
+  selectedFields = [];
+  document.querySelectorAll('.field-checkbox').forEach(function(cb){ cb.checked = false; });
+  renderSelected();
+});
+
+// Generate report
+document.getElementById('btn-generate').addEventListener('click', function() {
+  if (selectedFields.length === 0) { alert('Select at least one field.'); return; }
+  var params = selectedFields.map(function(f){ return 'fields=' + encodeURIComponent(f); }).join('&');
+  window.location.href = '{{ url_for("reports_builder") }}?' + params;
+});
+
+// Export CSV
+document.getElementById('btn-csv').addEventListener('click', function() {
+  if (selectedFields.length === 0) { alert('Select at least one field.'); return; }
+  var params = selectedFields.map(function(f){ return 'fields=' + encodeURIComponent(f); }).join('&');
+  window.location.href = '{{ url_for("reports_builder_csv") }}?' + params;
+});
+
+// Drag-and-drop reorder
+var dragSrcKey = null;
+
+function addDragEvents(el) {
+  el.addEventListener('dragstart', function(e) {
+    dragSrcKey = el.dataset.key;
+    e.dataTransfer.effectAllowed = 'move';
+    el.style.opacity = '0.5';
+  });
+  el.addEventListener('dragend', function() {
+    el.style.opacity = '';
+    document.querySelectorAll('#selected-list li').forEach(function(li) {
+      li.classList.remove('drag-over');
+    });
+  });
+  el.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over');
+    return false;
+  });
+  el.addEventListener('dragleave', function() {
+    el.classList.remove('drag-over');
+  });
+  el.addEventListener('drop', function(e) {
+    e.stopPropagation();
+    if (dragSrcKey && dragSrcKey !== el.dataset.key) {
+      var srcIdx = selectedFields.indexOf(dragSrcKey);
+      var dstIdx = selectedFields.indexOf(el.dataset.key);
+      if (srcIdx !== -1 && dstIdx !== -1) {
+        selectedFields.splice(srcIdx, 1);
+        selectedFields.splice(dstIdx, 0, dragSrcKey);
+        renderSelected();
+      }
+    }
+    return false;
+  });
+}
+
+renderSelected();
+</script>
+{% endblock %}

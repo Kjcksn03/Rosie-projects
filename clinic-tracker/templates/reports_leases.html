@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Lease Summary Report | VIP Medical Group{% endblock %}
+{% block head %}
+<style>
+.report-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.report-table th { background:var(--navy,#1a3a5c); color:#fff; padding:.55rem .7rem; text-align:left; white-space:nowrap; position:sticky; top:0; z-index:2; }
+.report-table td { padding:.5rem .7rem; border-bottom:1px solid #e8ecf0; vertical-align:top; }
+.report-table tr:hover td { background:#f5f7fa; }
+.report-table tr:nth-child(even) td { background:#fafbfc; }
+.report-table tr:nth-child(even):hover td { background:#f0f3f7; }
+.clinic-name-cell { font-weight:700; color:var(--navy,#1a3a5c); white-space:nowrap; }
+.money-cell { text-align:right; white-space:nowrap; font-family:monospace; }
+.net-pos { color:#c0392b; font-weight:700; }
+.net-neg { color:#16a34a; font-weight:700; }
+.no-data { color:#aaa; font-style:italic; }
+.table-wrap { overflow-x:auto; border-radius:8px; box-shadow:0 1px 8px rgba(0,0,0,.08); }
+@media print {
+  .navbar, .flash-container, .no-print { display:none !important; }
+  .report-table th { background:#1a3a5c !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body { font-size:11px; }
+  .table-wrap { box-shadow:none; overflow:visible; }
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:1400px;margin:2rem auto;padding:0 1rem;">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem;">
+    <div>
+      <h2 style="margin:0;color:var(--navy);">🏢 Lease Summary Report</h2>
+      <p style="margin:.2rem 0 0;color:#555;">All active clinics — lease data at a glance</p>
+    </div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;" class="no-print">
+      <button onclick="window.print()" class="btn btn-secondary btn-sm">🖨️ Print</button>
+      <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">← Back</a>
+    </div>
+  </div>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Clinic</th>
+          <th>State</th>
+          <th>Address</th>
+          <th>Suite</th>
+          <th>Lease Start</th>
+          <th>Lease End</th>
+          <th>Base Rent</th>
+          <th>CAMs</th>
+          <th>Total/Mo</th>
+          <th>Annual Inc %</th>
+          <th>Sec Deposit</th>
+          <th>TI Allowance</th>
+          <th>Buildout Est.</th>
+          <th>Net Cost VIP</th>
+          <th>Sq Ft</th>
+          <th>Landlord</th>
+          <th>Attorney</th>
+          <th>Lease Signed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set c = row.clinic %}
+        {% set l = row.lease %}
+        <tr>
+          <td class="clinic-name-cell">
+            <a href="{{ url_for('lease_summary', clinic_id=c.id) }}" style="color:var(--navy);text-decoration:none;">
+              {{ c.name }}
+            </a>
+          </td>
+          <td>{{ c.state or '' }}</td>
+          <td>{{ l.building_address if l and l.building_address else '<span class="no-data">—</span>'|safe }}</td>
+          <td>{{ l.suite_unit if l and l.suite_unit else '' }}</td>
+          <td style="white-space:nowrap;">{{ l.lease_start_date if l and l.lease_start_date else '' }}</td>
+          <td style="white-space:nowrap;">{{ l.lease_end_date if l and l.lease_end_date else '' }}</td>
+          <td class="money-cell">{{ ('$' + l.base_rent) if l and l.base_rent else '' }}</td>
+          <td class="money-cell">{{ ('$' + l.cam_rent) if l and l.cam_rent else '' }}</td>
+          <td class="money-cell"><strong>{{ ('$' + l.total_monthly_rent) if l and l.total_monthly_rent else '' }}</strong></td>
+          <td style="text-align:center;">{{ l.annual_rent_increase_pct if l and l.annual_rent_increase_pct else '' }}</td>
+          <td class="money-cell">{{ ('$' + l.security_deposit) if l and l.security_deposit else '' }}</td>
+          <td class="money-cell">{{ ('$' + l.ti_allowance) if l and l.ti_allowance else '' }}</td>
+          <td class="money-cell">{{ ('$' + l.buildout_cost_estimate) if l and l.buildout_cost_estimate else '' }}</td>
+          <td class="money-cell {% if row.net_cost_vip is not none %}{% if row.net_cost_vip >= 0 %}net-pos{% else %}net-neg{% endif %}{% endif %}">
+            {% if row.net_cost_vip is not none %}
+              ${{ '{:,.0f}'.format(row.net_cost_vip) }}
+            {% endif %}
+          </td>
+          <td>{{ l.square_footage if l and l.square_footage else '' }}</td>
+          <td>{{ l.landlord_name if l and l.landlord_name else '' }}</td>
+          <td>{{ l.attorney_name if l and l.attorney_name else '' }}</td>
+          <td style="white-space:nowrap;">{{ c.lease_signed_date or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:.8rem;color:#888;margin:.8rem 0 0;" class="no-print">
+    {{ rows|length }} clinic(s) shown · Net Cost to VIP = Buildout Cost Estimate − TI Allowance
+  </p>
+  {% else %}
+  <div class="card" style="padding:2rem;text-align:center;color:#888;">
+    No active clinics found. <a href="{{ url_for('new_clinic') }}">Create one →</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

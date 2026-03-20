@@ -160,12 +160,27 @@
           </div>
 
           <div class="lease-group">
-            <label>Monthly Rent
-              {% if clinic.lease_filename %}<button type="button" class="view-lease-btn" onclick="openPdfModal('{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.lease_filename) }}')">View in Lease</button>{% endif %}
-            </label>
-            <input type="text" name="monthly_rent" class="form-control {% if pdf_extracted and pdf_extracted.monthly_rent %}extracted-highlight{% endif %}"
-              placeholder="e.g. 8500"
-              value="{{ pdf_extracted.monthly_rent if pdf_extracted and pdf_extracted.monthly_rent else (lease.monthly_rent if lease else '') }}">
+            <label>Base Rent (per month)</label>
+            <input type="text" name="base_rent" class="form-control" placeholder="e.g. 7500"
+              value="{{ lease.base_rent if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>CAMs / Triple Net / Other Costs (per month)</label>
+            <input type="text" name="cam_rent" class="form-control" placeholder="e.g. 1200"
+              value="{{ lease.cam_rent if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label><strong>Total Rent per Month</strong></label>
+            <input type="text" name="total_monthly_rent" class="form-control" placeholder="e.g. 8700"
+              value="{{ lease.total_monthly_rent if lease else '' }}">
+          </div>
+          <div class="lease-group">
+            <label>Annual Rent Increase %</label>
+            <input type="text" name="annual_rent_increase_pct" class="form-control" placeholder="e.g. 3%"
+              value="{{ lease.annual_rent_increase_pct if lease else '' }}">
+          </div>
+          <div class="lease-group" style="display:none;">
+            <input type="hidden" name="monthly_rent" value="{{ lease.monthly_rent if lease else '' }}">
           </div>
           <div class="lease-group">
             <label>Security Deposit
@@ -180,8 +195,14 @@
               {% if clinic.lease_filename %}<button type="button" class="view-lease-btn" onclick="openPdfModal('{{ url_for('clinic_uploaded_file', clinic_id=clinic.id, filename=clinic.lease_filename) }}')">View in Lease</button>{% endif %}
             </label>
             <input type="text" name="ti_allowance" class="form-control {% if pdf_extracted and pdf_extracted.ti_allowance %}extracted-highlight{% endif %}"
-              placeholder="e.g. 50/sq ft"
+              placeholder="e.g. 50000"
               value="{{ pdf_extracted.ti_allowance if pdf_extracted and pdf_extracted.ti_allowance else (lease.ti_allowance if lease else '') }}">
+          </div>
+          <div class="lease-group">
+            <label>Buildout Cost Estimate</label>
+            <input type="text" name="buildout_cost_estimate" class="form-control"
+              placeholder="e.g. 120000"
+              value="{{ lease.buildout_cost_estimate if lease else '' }}">
           </div>
 
           <div class="lease-group">
@@ -207,6 +228,34 @@
       </form>
     </div>
   </div>
+
+  {% if lease %}
+  <!-- Net Cost to VIP on Lease -->
+  <div class="card" style="margin-top:1.5rem;">
+    <div class="card-header" style="background:#1a3a5c;color:#fff;padding:1rem 1.5rem;border-radius:8px 8px 0 0;">
+      <h3 style="margin:0;">🏗️ Total Cost to VIP on Lease</h3>
+    </div>
+    <div style="padding:1.5rem;">
+      <table class="fin-table">
+        <tbody>
+          <tr>
+            <td class="fin-label">Buildout Cost Estimate</td>
+            <td class="fin-val" id="ncv-buildout">{{ lease.buildout_cost_estimate or '—' }}</td>
+          </tr>
+          <tr>
+            <td class="fin-label">Minus TI Allowance</td>
+            <td class="fin-val" id="ncv-ti">{{ lease.ti_allowance or '—' }}</td>
+          </tr>
+          <tr class="fin-total">
+            <td class="fin-label" style="font-weight:700;">= Net Cost to VIP on Lease</td>
+            <td class="fin-val" id="ncv-net" style="font-size:1.1rem;">—</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="font-size:.8rem;color:#888;margin:.6rem 0 0;">* Buildout Cost Estimate − TI Allowance = Net Cost to VIP</p>
+    </div>
+  </div>
+  {% endif %}
 
   {% if lease and lease.monthly_rent %}
   <!-- Financial Summary -->
@@ -326,6 +375,32 @@ function closePdfModal() {
 document.getElementById('pdfModal').addEventListener('click', function(e){
   if (e.target === this) closePdfModal();
 });
+
+// Net Cost to VIP calculation
+(function(){
+  function parseNum(s) {
+    if (!s) return null;
+    var n = parseFloat(s.replace(/[^0-9.]/g,''));
+    return isNaN(n) ? null : n;
+  }
+  function fmt(n) {
+    if (n === null) return '—';
+    return '$' + n.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+  }
+  var buildoutEl = document.getElementById('ncv-buildout');
+  var tiEl = document.getElementById('ncv-ti');
+  var netEl = document.getElementById('ncv-net');
+  if (!netEl) return;
+  var buildout = parseNum(buildoutEl ? buildoutEl.textContent : '');
+  var ti = parseNum(tiEl ? tiEl.textContent : '');
+  if (buildout !== null) {
+    buildoutEl.textContent = fmt(buildout);
+    var net = (ti !== null) ? (buildout - ti) : buildout;
+    if (tiEl && ti !== null) tiEl.textContent = '− ' + fmt(ti);
+    netEl.textContent = fmt(net);
+    netEl.style.color = net < 0 ? '#16a34a' : '#c0392b';
+  }
+})();
 
 // Financial summary calculations
 (function(){

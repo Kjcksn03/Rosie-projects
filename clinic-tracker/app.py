@@ -392,6 +392,16 @@ def init_db():
     for col_name, col_type in new_clinic_cols:
         if col_name not in existing_cols:
             db.execute(f"ALTER TABLE clinics ADD COLUMN {col_name} {col_type}")
+
+    # Migrate lease_summaries to add new rent fields
+    new_lease_cols = [
+        ('base_rent', 'TEXT'), ('cam_rent', 'TEXT'), ('total_monthly_rent', 'TEXT'),
+        ('annual_rent_increase_pct', 'TEXT'), ('buildout_cost_estimate', 'TEXT'),
+    ]
+    existing_lease_cols = [row[1] for row in db.execute("PRAGMA table_info(lease_summaries)").fetchall()]
+    for col_name, col_type in new_lease_cols:
+        if col_name not in existing_lease_cols:
+            db.execute(f"ALTER TABLE lease_summaries ADD COLUMN {col_name} {col_type}")
     db.commit()
 
     # Seed admin user
@@ -1273,9 +1283,14 @@ def lease_summary(clinic_id):
             'landlord_broker': request.form.get('landlord_broker', '') or None,
             'lease_start_date': request.form.get('lease_start_date', '') or None,
             'lease_end_date': request.form.get('lease_end_date', '') or None,
+            'base_rent': request.form.get('base_rent', '') or None,
+            'cam_rent': request.form.get('cam_rent', '') or None,
+            'total_monthly_rent': request.form.get('total_monthly_rent', '') or None,
+            'annual_rent_increase_pct': request.form.get('annual_rent_increase_pct', '') or None,
             'monthly_rent': request.form.get('monthly_rent', '') or None,
             'security_deposit': request.form.get('security_deposit', '') or None,
             'ti_allowance': request.form.get('ti_allowance', '') or None,
+            'buildout_cost_estimate': request.form.get('buildout_cost_estimate', '') or None,
             'rent_commencement_date': request.form.get('rent_commencement_date', '') or None,
             'square_footage': request.form.get('square_footage', '') or None,
             'suite_unit': request.form.get('suite_unit', '') or None,
@@ -1393,8 +1408,9 @@ def clinic_construction(clinic_id):
     if not tasks:
         populate_construction_tasks(clinic_id)
         tasks = query_db("SELECT * FROM construction_tasks WHERE clinic_id=? ORDER BY order_index", [clinic_id])
+    tasks_list = [dict(t) for t in tasks]
     return render_template('construction.html',
-        clinic=clinic, tasks=tasks,
+        clinic=clinic, tasks=tasks, tasks_json=tasks_list,
         construction_statuses=CONSTRUCTION_STATUSES)
 
 @app.route('/clinic/<int:clinic_id>/construction/update', methods=['POST'])
@@ -1896,6 +1912,362 @@ def weekly_report_edit(clinic_id):
                       [clinic_id, week_ending], one=True)
     return render_template('weekly_report_edit.html',
         clinic=clinic, report=report, week_ending=week_ending)
+
+# ─── Reports ─────────────────────────────────────────────────────────────────
+
+@app.route('/reports/leases')
+@login_required
+def reports_leases():
+    clinics = query_db(
+        "SELECT * FROM clinics WHERE is_template=0 AND status != 'Archived' ORDER BY name ASC"
+    )
+    rows = []
+    for c in clinics:
+        lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [c['id']], one=True)
+        # Compute net cost to VIP from lease data
+        net_cost_vip = None
+        if lease:
+            def parse_dollar(s):
+                if not s:
+                    return None
+                try:
+                    return float(str(s).replace('$', '').replace(',', '').strip())
+                except Exception:
+                    return None
+            buildout = parse_dollar(lease['buildout_cost_estimate'] if lease else None)
+            ti = parse_dollar(lease['ti_allowance'] if lease else None)
+            if buildout is not None and ti is not None:
+                net_cost_vip = buildout - ti
+            elif buildout is not None:
+                net_cost_vip = buildout
+        rows.append({'clinic': dict(c), 'lease': dict(lease) if lease else None, 'net_cost_vip': net_cost_vip})
+    return render_template('reports_leases.html', rows=rows)
+
+
+@app.route('/reports/builder')
+@login_required
+def reports_builder():
+    # Get selected fields from URL params
+    selected_fields = request.args.getlist('fields')
+
+    # All field definitions: key -> (label, source)
+    FIELD_GROUPS = [
+        ('Basic Info', [
+            ('clinic_name', 'Clinic Name'),
+            ('state', 'State'),
+            ('entity', 'Entity'),
+            ('site_status', 'Site Status'),
+            ('doctor_status', 'Doctor Status'),
+            ('targeting_opening_month', 'Targeting Opening Month'),
+            ('opening_date', 'Opening Date'),
+            ('setup_week', 'Setup Week'),
+            ('procedures_done_where', 'Procedures Done Where'),
+            ('paired_clinic', 'Paired Clinic'),
+        ]),
+        ('Team', [
+            ('sg_project_manager', 'SG Project Manager'),
+            ('sg_onsite_member', 'SG Onsite Member'),
+            ('ops_onsite_member', 'Operations Onsite Member'),
+        ]),
+        ('Lease', [
+            ('lease_signed_date', 'Lease Signed Date'),
+            ('building_address', 'Building Address'),
+            ('suite_unit', 'Suite/Unit'),
+            ('square_footage', 'Square Footage'),
+            ('landlord_name', 'Landlord Name'),
+            ('lease_start_date', 'Lease Start'),
+            ('lease_end_date', 'Lease End'),
+            ('base_rent', 'Base Rent'),
+            ('cam_rent', 'CAMs'),
+            ('total_monthly_rent', 'Total Monthly Rent'),
+            ('annual_rent_increase_pct', 'Annual Increase %'),
+            ('security_deposit', 'Security Deposit'),
+            ('ti_allowance', 'TI Allowance'),
+            ('buildout_cost_estimate', 'Buildout Cost Estimate'),
+            ('lease_net_cost_vip', 'Net Cost to VIP'),
+            ('attorney_name', 'Attorney Name'),
+        ]),
+        ('Progress', [
+            ('overall_pct', 'Overall % Complete'),
+            ('tasks_complete', 'Tasks Complete'),
+            ('tasks_total', 'Tasks Total'),
+            ('tasks_overdue', 'Tasks Overdue'),
+            ('construction_phase', 'Construction Phase'),
+            ('supplies_pct', 'Supplies % Delivered'),
+        ]),
+        ('Financials', [
+            ('total_expenses', 'Total Expenses'),
+            ('buildout_cost', 'Buildout Cost (from clinics)'),
+            ('ti_allowance_clinic', 'TI Allowance (from clinics)'),
+            ('net_cost_vip_clinic', 'Net Cost to VIP (clinics)'),
+        ]),
+        ('Notes', [
+            ('data_analysis_summary', 'Data Analysis Summary'),
+            ('clinic_notes', 'Clinic Notes'),
+        ]),
+    ]
+
+    report_rows = []
+    if selected_fields:
+        clinics = query_db(
+            "SELECT * FROM clinics WHERE is_template=0 AND status != 'Archived' ORDER BY name ASC"
+        )
+        today_str = str(datetime.now().date())
+
+        for c in clinics:
+            lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [c['id']], one=True)
+
+            def parse_dollar(s):
+                if not s:
+                    return None
+                try:
+                    return float(str(s).replace('$', '').replace(',', '').strip())
+                except Exception:
+                    return None
+
+            # Compute progress stats
+            total_tasks = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=?", [c['id']], one=True)['cnt']
+            done_tasks = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND status='Complete'", [c['id']], one=True)['cnt']
+            overdue_tasks = query_db(
+                "SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND due_date < ? AND status NOT IN ('Complete')",
+                [c['id'], today_str], one=True)['cnt']
+            pct = round((done_tasks / total_tasks * 100) if total_tasks > 0 else 0)
+
+            s_total = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=?", [c['id']], one=True)['cnt']
+            s_delivered = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=? AND order_status='Delivered'", [c['id']], one=True)['cnt']
+            supply_pct = round((s_delivered / s_total * 100) if s_total > 0 else 0)
+
+            current_construction = query_db(
+                "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='In Progress' ORDER BY order_index LIMIT 1",
+                [c['id']], one=True)
+            if not current_construction:
+                current_construction = query_db(
+                    "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='Not Started' ORDER BY order_index LIMIT 1",
+                    [c['id']], one=True)
+            construction_phase = current_construction['name'] if current_construction else 'Complete'
+
+            total_expenses = query_db(
+                "SELECT SUM(amount) as s FROM expenses WHERE clinic_id=?", [c['id']], one=True)['s'] or 0
+
+            # Net cost to VIP from lease
+            lease_net_cost_vip = None
+            if lease:
+                buildout = parse_dollar(lease['buildout_cost_estimate'])
+                ti = parse_dollar(lease['ti_allowance'])
+                if buildout is not None and ti is not None:
+                    lease_net_cost_vip = buildout - ti
+                elif buildout is not None:
+                    lease_net_cost_vip = buildout
+
+            # Net cost to VIP from clinics table
+            net_cost_vip_clinic = None
+            bc = parse_dollar(c['buildout_cost']) if 'buildout_cost' in c.keys() else None
+            ti_c = parse_dollar(c['ti_allowance']) if 'ti_allowance' in c.keys() else None
+            if bc is not None and ti_c is not None:
+                net_cost_vip_clinic = bc - ti_c
+
+            def fmt_money(n):
+                if n is None:
+                    return ''
+                return f'${n:,.0f}'
+
+            # Build row dict
+            all_data = {
+                'clinic_name': c['name'],
+                'state': c['state'] or '',
+                'entity': c['entity'] or '',
+                'site_status': c['site_status'] or '',
+                'doctor_status': c['doctor_status'] or '',
+                'targeting_opening_month': c['targeting_opening_month'] or '',
+                'opening_date': c['opening_date'] or '',
+                'setup_week': c['setup_week'] or '',
+                'procedures_done_where': c['procedures_done_where'] or '',
+                'paired_clinic': c['paired_clinic'] or '',
+                'sg_project_manager': c['sg_project_manager'] or '',
+                'sg_onsite_member': c['sg_onsite_member'] or '',
+                'ops_onsite_member': c['ops_onsite_member'] or '',
+                'lease_signed_date': c['lease_signed_date'] or '',
+                'building_address': (lease['building_address'] if lease else '') or '',
+                'suite_unit': (lease['suite_unit'] if lease else '') or '',
+                'square_footage': (lease['square_footage'] if lease else '') or '',
+                'landlord_name': (lease['landlord_name'] if lease else '') or '',
+                'lease_start_date': (lease['lease_start_date'] if lease else '') or '',
+                'lease_end_date': (lease['lease_end_date'] if lease else '') or '',
+                'base_rent': (lease['base_rent'] if lease else '') or '',
+                'cam_rent': (lease['cam_rent'] if lease else '') or '',
+                'total_monthly_rent': (lease['total_monthly_rent'] if lease else '') or '',
+                'annual_rent_increase_pct': (lease['annual_rent_increase_pct'] if lease else '') or '',
+                'security_deposit': (lease['security_deposit'] if lease else '') or '',
+                'ti_allowance': (lease['ti_allowance'] if lease else '') or '',
+                'buildout_cost_estimate': (lease['buildout_cost_estimate'] if lease else '') or '',
+                'lease_net_cost_vip': fmt_money(lease_net_cost_vip),
+                'attorney_name': (lease['attorney_name'] if lease else '') or '',
+                'overall_pct': f'{pct}%',
+                'tasks_complete': str(done_tasks),
+                'tasks_total': str(total_tasks),
+                'tasks_overdue': str(overdue_tasks),
+                'construction_phase': construction_phase,
+                'supplies_pct': f'{supply_pct}%',
+                'total_expenses': fmt_money(total_expenses),
+                'buildout_cost': fmt_money(bc),
+                'ti_allowance_clinic': fmt_money(ti_c),
+                'net_cost_vip_clinic': fmt_money(net_cost_vip_clinic),
+                'data_analysis_summary': c['data_analysis_summary'] or '',
+                'clinic_notes': c['clinic_notes'] or '',
+            }
+
+            row = {f: all_data.get(f, '') for f in selected_fields}
+            report_rows.append(row)
+
+    return render_template('reports_builder.html',
+        field_groups=FIELD_GROUPS,
+        selected_fields=selected_fields,
+        report_rows=report_rows)
+
+
+@app.route('/reports/builder/csv')
+@login_required
+def reports_builder_csv():
+    selected_fields = request.args.getlist('fields')
+    if not selected_fields:
+        return redirect(url_for('reports_builder'))
+
+    FIELD_LABELS = {
+        'clinic_name': 'Clinic Name', 'state': 'State', 'entity': 'Entity',
+        'site_status': 'Site Status', 'doctor_status': 'Doctor Status',
+        'targeting_opening_month': 'Targeting Opening Month', 'opening_date': 'Opening Date',
+        'setup_week': 'Setup Week', 'procedures_done_where': 'Procedures Done Where',
+        'paired_clinic': 'Paired Clinic', 'sg_project_manager': 'SG Project Manager',
+        'sg_onsite_member': 'SG Onsite Member', 'ops_onsite_member': 'Operations Onsite Member',
+        'lease_signed_date': 'Lease Signed Date', 'building_address': 'Building Address',
+        'suite_unit': 'Suite/Unit', 'square_footage': 'Square Footage',
+        'landlord_name': 'Landlord Name', 'lease_start_date': 'Lease Start',
+        'lease_end_date': 'Lease End', 'base_rent': 'Base Rent', 'cam_rent': 'CAMs',
+        'total_monthly_rent': 'Total Monthly Rent', 'annual_rent_increase_pct': 'Annual Increase %',
+        'security_deposit': 'Security Deposit', 'ti_allowance': 'TI Allowance',
+        'buildout_cost_estimate': 'Buildout Cost Estimate', 'lease_net_cost_vip': 'Net Cost to VIP',
+        'attorney_name': 'Attorney Name', 'overall_pct': 'Overall % Complete',
+        'tasks_complete': 'Tasks Complete', 'tasks_total': 'Tasks Total',
+        'tasks_overdue': 'Tasks Overdue', 'construction_phase': 'Construction Phase',
+        'supplies_pct': 'Supplies % Delivered', 'total_expenses': 'Total Expenses',
+        'buildout_cost': 'Buildout Cost (clinics)', 'ti_allowance_clinic': 'TI Allowance (clinics)',
+        'net_cost_vip_clinic': 'Net Cost to VIP (clinics)',
+        'data_analysis_summary': 'Data Analysis Summary', 'clinic_notes': 'Clinic Notes',
+    }
+
+    clinics = query_db(
+        "SELECT * FROM clinics WHERE is_template=0 AND status != 'Archived' ORDER BY name ASC"
+    )
+    today_str = str(datetime.now().date())
+
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow([FIELD_LABELS.get(f, f) for f in selected_fields])
+
+    for c in clinics:
+        lease = query_db("SELECT * FROM lease_summaries WHERE clinic_id=?", [c['id']], one=True)
+
+        def parse_dollar(s):
+            if not s:
+                return None
+            try:
+                return float(str(s).replace('$', '').replace(',', '').strip())
+            except Exception:
+                return None
+
+        total_tasks = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=?", [c['id']], one=True)['cnt']
+        done_tasks = query_db("SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND status='Complete'", [c['id']], one=True)['cnt']
+        overdue_tasks = query_db(
+            "SELECT COUNT(*) as cnt FROM tasks WHERE clinic_id=? AND due_date < ? AND status NOT IN ('Complete')",
+            [c['id'], today_str], one=True)['cnt']
+        pct = round((done_tasks / total_tasks * 100) if total_tasks > 0 else 0)
+
+        s_total = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=?", [c['id']], one=True)['cnt']
+        s_delivered = query_db("SELECT COUNT(*) as cnt FROM supply_items WHERE clinic_id=? AND order_status='Delivered'", [c['id']], one=True)['cnt']
+        supply_pct = round((s_delivered / s_total * 100) if s_total > 0 else 0)
+
+        current_construction = query_db(
+            "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='In Progress' ORDER BY order_index LIMIT 1",
+            [c['id']], one=True)
+        if not current_construction:
+            current_construction = query_db(
+                "SELECT name FROM construction_tasks WHERE clinic_id=? AND status='Not Started' ORDER BY order_index LIMIT 1",
+                [c['id']], one=True)
+        construction_phase = current_construction['name'] if current_construction else 'Complete'
+
+        total_expenses = query_db(
+            "SELECT SUM(amount) as s FROM expenses WHERE clinic_id=?", [c['id']], one=True)['s'] or 0
+
+        lease_net_cost_vip = None
+        if lease:
+            buildout = parse_dollar(lease['buildout_cost_estimate'])
+            ti = parse_dollar(lease['ti_allowance'])
+            if buildout is not None and ti is not None:
+                lease_net_cost_vip = buildout - ti
+            elif buildout is not None:
+                lease_net_cost_vip = buildout
+
+        bc = parse_dollar(c['buildout_cost']) if 'buildout_cost' in c.keys() else None
+        ti_c = parse_dollar(c['ti_allowance']) if 'ti_allowance' in c.keys() else None
+        net_cost_vip_clinic = None
+        if bc is not None and ti_c is not None:
+            net_cost_vip_clinic = bc - ti_c
+
+        def fmt_money(n):
+            if n is None:
+                return ''
+            return f'${n:,.0f}'
+
+        all_data = {
+            'clinic_name': c['name'],
+            'state': c['state'] or '',
+            'entity': c['entity'] or '',
+            'site_status': c['site_status'] or '',
+            'doctor_status': c['doctor_status'] or '',
+            'targeting_opening_month': c['targeting_opening_month'] or '',
+            'opening_date': c['opening_date'] or '',
+            'setup_week': c['setup_week'] or '',
+            'procedures_done_where': c['procedures_done_where'] or '',
+            'paired_clinic': c['paired_clinic'] or '',
+            'sg_project_manager': c['sg_project_manager'] or '',
+            'sg_onsite_member': c['sg_onsite_member'] or '',
+            'ops_onsite_member': c['ops_onsite_member'] or '',
+            'lease_signed_date': c['lease_signed_date'] or '',
+            'building_address': (lease['building_address'] if lease else '') or '',
+            'suite_unit': (lease['suite_unit'] if lease else '') or '',
+            'square_footage': (lease['square_footage'] if lease else '') or '',
+            'landlord_name': (lease['landlord_name'] if lease else '') or '',
+            'lease_start_date': (lease['lease_start_date'] if lease else '') or '',
+            'lease_end_date': (lease['lease_end_date'] if lease else '') or '',
+            'base_rent': (lease['base_rent'] if lease else '') or '',
+            'cam_rent': (lease['cam_rent'] if lease else '') or '',
+            'total_monthly_rent': (lease['total_monthly_rent'] if lease else '') or '',
+            'annual_rent_increase_pct': (lease['annual_rent_increase_pct'] if lease else '') or '',
+            'security_deposit': (lease['security_deposit'] if lease else '') or '',
+            'ti_allowance': (lease['ti_allowance'] if lease else '') or '',
+            'buildout_cost_estimate': (lease['buildout_cost_estimate'] if lease else '') or '',
+            'lease_net_cost_vip': fmt_money(lease_net_cost_vip),
+            'attorney_name': (lease['attorney_name'] if lease else '') or '',
+            'overall_pct': f'{pct}%',
+            'tasks_complete': str(done_tasks),
+            'tasks_total': str(total_tasks),
+            'tasks_overdue': str(overdue_tasks),
+            'construction_phase': construction_phase,
+            'supplies_pct': f'{supply_pct}%',
+            'total_expenses': fmt_money(total_expenses),
+            'buildout_cost': fmt_money(bc),
+            'ti_allowance_clinic': fmt_money(ti_c),
+            'net_cost_vip_clinic': fmt_money(net_cost_vip_clinic),
+            'data_analysis_summary': c['data_analysis_summary'] or '',
+            'clinic_notes': c['clinic_notes'] or '',
+        }
+
+        writer.writerow([all_data.get(f, '') for f in selected_fields])
+
+    output = si.getvalue()
+    return Response(output, mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment;filename=custom_report.csv'})
+
 
 # ─── Due-date notifications check ────────────────────────────────────────────
 

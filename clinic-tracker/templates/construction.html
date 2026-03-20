@@ -183,7 +183,7 @@ document.querySelectorAll('[data-task-id]').forEach(function(row) {
 
 // Draw Gantt chart
 (function(){
-  var tasksData = {{ tasks | tojson }};
+  var tasksData = {{ tasks_json | tojson }};
   // Filter tasks with dates
   var dated = tasksData.filter(function(t){ return t.start_date && t.due_date; });
   if (!dated.length) return;
