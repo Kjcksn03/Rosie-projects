@@ -1,136 +1,132 @@
 {% extends "base.html" %}
-{% block title %}VIP Medical Group – Weekly Clinic Launch Report{% endblock %}
-{% block head %}
-<style>
-.report-header-block { background:var(--navy,#1a2a4a); color:#fff; border-radius:10px; padding:1.5rem 2rem; margin-bottom:1.5rem; }
-.report-header-block h1 { margin:0; font-size:1.4rem; color:#fff; }
-.report-header-block .subtitle { color:var(--gold,#c8a951); font-size:1rem; margin-top:.3rem; }
-.clinic-report-card { background:#fff; border-radius:10px; border:1px solid #e0e0e0; padding:1.5rem; margin-bottom:1.25rem; border-left:5px solid var(--navy,#1a2a4a); }
-.clinic-report-card.status-on-track { border-left-color:#28a745; }
-.clinic-report-card.status-at-risk { border-left-color:#ffc107; }
-.clinic-report-card.status-delayed { border-left-color:#dc3545; }
-.clinic-name { font-size:1.1rem; font-weight:700; color:var(--navy,#1a2a4a); }
-.status-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-weight:700; font-size:.82rem; }
-.status-on-track { background:#d4edda; color:#155724; }
-.status-at-risk { background:#fff3cd; color:#856404; }
-.status-delayed { background:#f8d7da; color:#721c24; }
-.report-meta { display:flex; flex-wrap:wrap; gap:.4rem 1.2rem; font-size:.82rem; color:#666; margin:.5rem 0 1rem; }
-.report-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-@media (max-width:700px) { .report-grid { grid-template-columns:1fr; } }
-.report-field label { font-weight:600; color:var(--navy,#1a2a4a); font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:.2rem; }
-.report-field .value { color:#333; font-size:.88rem; line-height:1.5; white-space:pre-wrap; }
-.report-field .empty { color:#aaa; font-style:italic; font-size:.88rem; }
-.progress-bar-sm { height:6px; background:#e0e6ef; border-radius:3px; overflow:hidden; }
-.progress-bar-sm-fill { height:100%; background:var(--gold,#c8a951); border-radius:3px; }
-.week-selector { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
-@media print {
-  .navbar, .no-print, .flash-container { display:none !important; }
-  body { background:#fff; }
-  .clinic-report-card { page-break-inside:avoid; }
-}
-</style>
-{% endblock %}
+{% block title %}Weekly Clinic Report{% endblock %}
 {% block content %}
-<div class="container">
-  <div class="report-header-block">
-    <h1>VIP Medical Group — Weekly Clinic Launch Report</h1>
-    <div class="subtitle">Week of {{ week_ending }}</div>
-  </div>
+<style>
+@media print {
+  nav, .no-print { display: none !important; }
+  body { font-size: 11px; }
+}
+.status-on-track { color: #16a34a; font-weight: 700; }
+.status-at-risk { color: #d97706; font-weight: 700; }
+.status-delayed { color: #dc2626; font-weight: 700; }
+.status-not-submitted { color: #6b7280; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.report-table th { background: var(--navy); color: white; padding: 10px 8px; text-align: left; white-space: nowrap; }
+.report-table td { padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+.report-table tr:hover { background: #f8f9fa; }
+.progress-bar { height: 6px; background: #e5e7eb; border-radius: 3px; min-width: 60px; }
+.progress-fill { height: 100%; background: var(--gold); border-radius: 3px; }
+</style>
 
-  <div class="d-flex justify-between align-center mb-3 no-print" style="flex-wrap:wrap;gap:.75rem;">
-    <div class="week-selector">
-      <label style="font-weight:600;color:var(--navy)">📅 Week:</label>
-      <select onchange="location.href='/weekly-report?week='+this.value" class="form-control" style="width:auto;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;" class="no-print">
+  <div>
+    <h2 style="color:var(--navy);margin:0;">📊 Weekly Clinic Launch Report</h2>
+    <p style="color:#666;margin:4px 0 0;">Week Ending:
+      <select onchange="window.location.href='?week='+this.value" style="border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:14px;">
         {% for w in weeks %}
         <option value="{{ w }}" {% if w == week_ending %}selected{% endif %}>{{ w }}</option>
         {% endfor %}
       </select>
-    </div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline" onclick="window.print()">🖨️ Print Report</button>
-    </div>
+    </p>
   </div>
-
-  {% if not clinic_reports %}
-  <div class="empty-state" style="padding:3rem;text-align:center;">No active clinics found.</div>
-  {% endif %}
-
-  {% for cr in clinic_reports %}
-  {% set clinic = cr.clinic %}
-  {% set report = cr.report %}
-  {% set status = report.status if report else 'On Track' %}
-  <div class="clinic-report-card status-{{ status|lower|replace(' ','-') }}">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;">
-      <div>
-        <div class="clinic-name">{{ clinic.name }}</div>
-        <div class="report-meta">
-          {% if clinic.state %}<span>📍 {{ clinic.state }}</span>{% endif %}
-          {% if clinic.opening_date %}<span>🗓️ Opening: {{ clinic.opening_date }}</span>{% endif %}
-          {% if clinic.sg_project_manager %}<span>👤 PM: {{ clinic.sg_project_manager }}</span>{% endif %}
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
-        <span class="status-badge status-{{ status|lower|replace(' ','-') }}">
-          {% if status == 'On Track' %}✅{% elif status == 'At Risk' %}⚠️{% else %}🔴{% endif %}
-          {{ status }}
-        </span>
-        <a href="{{ url_for('weekly_report_edit', clinic_id=clinic.id, week=week_ending) }}" class="btn btn-gold btn-sm no-print" style="font-size:.8rem;padding:4px 10px;">✏️ Edit</a>
-      </div>
-    </div>
-
-    <!-- Progress stats -->
-    <div style="display:flex;gap:2rem;margin-bottom:1rem;flex-wrap:wrap;">
-      <div style="min-width:140px;">
-        <div style="font-size:.78rem;color:#666;margin-bottom:3px;">Overall Progress</div>
-        <div class="progress-bar-sm"><div class="progress-bar-sm-fill" style="width:{{ cr.pct }}%"></div></div>
-        <div style="font-size:.82rem;color:var(--navy);font-weight:600;">{{ cr.pct }}%</div>
-      </div>
-      <div style="min-width:140px;">
-        <div style="font-size:.78rem;color:#666;margin-bottom:3px;">Supplies Delivered</div>
-        <div class="progress-bar-sm"><div class="progress-bar-sm-fill" style="width:{{ cr.supply_pct }}%"></div></div>
-        <div style="font-size:.82rem;color:var(--navy);font-weight:600;">{{ cr.supply_pct }}%</div>
-      </div>
-      <div>
-        <div style="font-size:.78rem;color:#666;margin-bottom:3px;">Construction Phase</div>
-        <div style="font-size:.82rem;color:var(--navy);font-weight:600;">{{ cr.construction_phase }}</div>
-      </div>
-    </div>
-
-    {% if report %}
-    <div class="report-grid">
-      <div class="report-field">
-        <label>This Week's Highlights</label>
-        {% if report.highlights %}<div class="value">{{ report.highlights }}</div>
-        {% else %}<div class="empty">Not provided</div>{% endif %}
-      </div>
-      <div class="report-field">
-        <label>Next Week's Plan</label>
-        {% if report.next_week %}<div class="value">{{ report.next_week }}</div>
-        {% else %}<div class="empty">Not provided</div>{% endif %}
-      </div>
-      <div class="report-field">
-        <label>Timeline Changes</label>
-        {% if report.timeline_changes %}<div class="value">{{ report.timeline_changes }}</div>
-        {% else %}<div class="empty">None</div>{% endif %}
-      </div>
-      <div class="report-field">
-        <label>Approvals Needed from Leadership</label>
-        {% if report.approvals_needed %}<div class="value">{{ report.approvals_needed }}</div>
-        {% else %}<div class="empty">None</div>{% endif %}
-      </div>
-      <div class="report-field" style="grid-column:1/-1;">
-        <label>Help Needed from Leadership</label>
-        {% if report.help_needed %}<div class="value">{{ report.help_needed }}</div>
-        {% else %}<div class="empty">None</div>{% endif %}
-      </div>
-    </div>
-    {% else %}
-    <div style="color:#aaa;font-style:italic;font-size:.88rem;text-align:center;padding:1rem 0;">
-      No report submitted for this week.
-      <a href="{{ url_for('weekly_report_edit', clinic_id=clinic.id, week=week_ending) }}" class="no-print">Submit one →</a>
-    </div>
-    {% endif %}
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="{{ url_for('weekly_report_csv', week=week_ending) }}" style="background:#16a34a;color:white;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">⬇️ Export CSV</a>
+    <button onclick="window.print()" style="background:var(--navy);color:white;padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:600;">🖨️ Print</button>
+    <button onclick="document.getElementById('email-form').style.display=document.getElementById('email-form').style.display==='none'?'flex':'none'" style="background:var(--gold);color:var(--navy);padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:600;">📧 Email Report</button>
   </div>
-  {% endfor %}
+</div>
+
+<!-- Email Form -->
+<div id="email-form" style="display:none;gap:10px;align-items:center;background:#f0f4ff;padding:16px;border-radius:10px;margin-bottom:16px;flex-wrap:wrap;" class="no-print">
+  <form method="POST" action="{{ url_for('weekly_report_email') }}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%">
+    <input type="hidden" name="week" value="{{ week_ending }}">
+    <label style="font-weight:600;white-space:nowrap;">Send to:</label>
+    <input type="email" name="to_email" placeholder="leadership@vipmedicalgroup.com" required
+      style="flex:1;padding:8px 12px;border:1px solid #ccc;border-radius:6px;min-width:240px;">
+    <button type="submit" style="background:var(--navy);color:white;padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-weight:600;">Send</button>
+  </form>
+</div>
+
+<!-- Summary Stats -->
+{% set on_track = clinic_reports | selectattr('report') | selectattr('report.status', 'equalto', 'On Track') | list | length %}
+{% set at_risk = clinic_reports | selectattr('report') | selectattr('report.status', 'equalto', 'At Risk') | list | length %}
+{% set delayed = clinic_reports | selectattr('report') | selectattr('report.status', 'equalto', 'Delayed') | list | length %}
+{% set not_sub = clinic_reports | length - on_track - at_risk - delayed %}
+<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 20px;text-align:center;">
+    <div style="font-size:22px;font-weight:700;color:#16a34a;">{{ on_track }}</div>
+    <div style="font-size:12px;color:#166534;">On Track</div>
+  </div>
+  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 20px;text-align:center;">
+    <div style="font-size:22px;font-weight:700;color:#d97706;">{{ at_risk }}</div>
+    <div style="font-size:12px;color:#92400e;">At Risk</div>
+  </div>
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 20px;text-align:center;">
+    <div style="font-size:22px;font-weight:700;color:#dc2626;">{{ delayed }}</div>
+    <div style="font-size:12px;color:#991b1b;">Delayed</div>
+  </div>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 20px;text-align:center;">
+    <div style="font-size:22px;font-weight:700;color:#6b7280;">{{ not_sub }}</div>
+    <div style="font-size:12px;color:#374151;">Not Submitted</div>
+  </div>
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 20px;text-align:center;">
+    <div style="font-size:22px;font-weight:700;color:#1d4ed8;">{{ clinic_reports | length }}</div>
+    <div style="font-size:12px;color:#1e3a8a;">Total Clinics</div>
+  </div>
+</div>
+
+<!-- Report Table -->
+<div style="overflow-x:auto;">
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th>Clinic</th>
+        <th>State</th>
+        <th>PM</th>
+        <th>Opening Date</th>
+        <th>Status</th>
+        <th>% Done</th>
+        <th>Supplies</th>
+        <th>Construction Phase</th>
+        <th>This Week's Highlights</th>
+        <th>Next Week's Plan</th>
+        <th>Timeline Changes</th>
+        <th>Approvals Needed</th>
+        <th>Help Needed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cr in clinic_reports %}
+      {% set r = cr.report or {} %}
+      {% set status = r.get('status', 'Not Submitted') if r else 'Not Submitted' %}
+      <tr>
+        <td><strong><a href="{{ url_for('clinic_dashboard', clinic_id=cr.clinic.id) }}" style="color:var(--navy);text-decoration:none;">{{ cr.clinic.name }}</a></strong></td>
+        <td>{{ cr.clinic.state or '—' }}</td>
+        <td>{{ cr.clinic.sg_project_manager or '—' }}</td>
+        <td>{{ cr.clinic.opening_date or 'TBD' }}</td>
+        <td>
+          {% if status == 'On Track' %}<span class="status-on-track">✅ On Track</span>
+          {% elif status == 'At Risk' %}<span class="status-at-risk">⚠️ At Risk</span>
+          {% elif status == 'Delayed' %}<span class="status-delayed">🔴 Delayed</span>
+          {% else %}<span class="status-not-submitted">— Not Submitted</span>{% endif %}
+        </td>
+        <td>
+          <div class="progress-bar"><div class="progress-fill" style="width:{{ cr.pct }}%"></div></div>
+          <span style="font-size:11px;color:#666;">{{ cr.pct }}%</span>
+        </td>
+        <td>
+          <div class="progress-bar"><div class="progress-fill" style="width:{{ cr.supply_pct }}%"></div></div>
+          <span style="font-size:11px;color:#666;">{{ cr.supply_pct }}%</span>
+        </td>
+        <td style="font-size:12px;">{{ cr.construction_phase }}</td>
+        <td style="font-size:12px;max-width:180px;">{{ (r.get('highlights') if r else '') or '—' }}</td>
+        <td style="font-size:12px;max-width:180px;">{{ (r.get('next_week') if r else '') or '—' }}</td>
+        <td style="font-size:12px;">{{ (r.get('timeline_changes') if r else '') or '—' }}</td>
+        <td style="font-size:12px;">{{ (r.get('approvals_needed') if r else '') or '—' }}</td>
+        <td style="font-size:12px;">{{ (r.get('help_needed') if r else '') or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
 {% endblock %}
